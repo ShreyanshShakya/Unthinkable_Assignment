@@ -1,10 +1,12 @@
 from contextlib import asynccontextmanager
+
+import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from app.api import api_router
 from app.core.config import get_settings
 from app.db.session import init_db
-from app.api import api_router
-import structlog
 
 structlog.configure(
     processors=[

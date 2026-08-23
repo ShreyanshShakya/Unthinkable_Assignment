@@ -1,16 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from uuid import UUID
 from typing import List, Optional
-from app.db.session import get_db
-from app.services.failed_delivery import FailedDeliveryService, get_failed_delivery_service
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+
+from app.api.deps import get_current_user, require_admin, require_agent, require_customer
+from app.models import User, UserRole
 from app.schemas.reschedule import (
-    RescheduleRequestCreate, RescheduleRequestUpdate, RescheduleRequestResponse,
-    DeliveryAttemptCreate, DeliveryAttemptUpdate, DeliveryAttemptResponse,
-    FailedDeliveryNotification
+    DeliveryAttemptResponse,
+    RescheduleRequestCreate,
+    RescheduleRequestResponse,
 )
-from app.api.deps import require_customer, require_agent, require_admin, get_current_user
-from app.models import User, UserRole, OrderStatus, AgentStatus
+from app.services.failed_delivery import FailedDeliveryService, get_failed_delivery_service
 
 router = APIRouter(prefix="/failed-deliveries", tags=["failed-deliveries"])
 
@@ -76,7 +76,7 @@ async def list_reschedule_requests(
 ):
     """List reschedule requests"""
     customer_id = current_user.id if current_user.role == UserRole.CUSTOMER else None
-    
+
     requests, total = await failed_service.list_reschedule_requests(
         order_id=order_id,
         customer_id=customer_id,
@@ -98,10 +98,10 @@ async def get_reschedule_request(
     reschedule = next((r for r in requests if r.id == reschedule_id), None)
     if not reschedule:
         raise HTTPException(status_code=404, detail="Reschedule request not found")
-    
+
     if current_user.role == UserRole.CUSTOMER and reschedule.customer_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
-    
+
     return reschedule
 
 
@@ -154,7 +154,7 @@ async def get_delivery_attempts(
     order = await failed_service.order_service.get_order(order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    
+
     if current_user.role == UserRole.CUSTOMER and order.customer_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
     if current_user.role == UserRole.AGENT:
@@ -163,6 +163,6 @@ async def get_delivery_attempts(
         agent_involved = any(a.agent_id == current_user.id for a in attempts)
         if not agent_involved:
             raise HTTPException(status_code=403, detail="Not authorized")
-    
+
     attempts = await failed_service.get_delivery_attempts(order_id)
     return attempts

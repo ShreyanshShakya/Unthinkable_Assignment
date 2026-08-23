@@ -1,9 +1,9 @@
-import pytest
-from httpx import AsyncClient, ASGITransport
-from app.main import app
-from app.models import OrderType, PaymentType, ZoneType, UserRole
 from uuid import uuid4
-from decimal import Decimal
+
+import pytest
+from httpx import ASGITransport, AsyncClient
+
+from app.main import app
 
 
 @pytest.fixture

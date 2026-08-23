@@ -1,17 +1,24 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from uuid import UUID
 from typing import List, Optional
-from datetime import datetime
-from app.db.session import get_db
-from app.models import RateCard, RateCardRule, CODSurcharge, Zone, OrderType, ZoneType
-from app.schemas.zone import (
-    RateCardCreate, RateCardUpdate, RateCardResponse,
-    RateCardRuleCreate, RateCardRuleUpdate, RateCardRuleResponse,
-    CODSurchargeCreate, CODSurchargeUpdate, CODSurchargeResponse
-)
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.api.deps import require_admin
+from app.db.session import get_db
+from app.models import CODSurcharge, OrderType, RateCard, RateCardRule, Zone, ZoneType
+from app.schemas.zone import (
+    CODSurchargeCreate,
+    CODSurchargeResponse,
+    CODSurchargeUpdate,
+    RateCardCreate,
+    RateCardResponse,
+    RateCardRuleCreate,
+    RateCardRuleResponse,
+    RateCardRuleUpdate,
+    RateCardUpdate,
+)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -22,7 +29,7 @@ async def create_rate_card(rate_card_data: RateCardCreate, db: AsyncSession = De
         raise HTTPException(status_code=400, detail="Invalid order type")
     if rate_card_data.zone_type not in [zt.value for zt in ZoneType]:
         raise HTTPException(status_code=400, detail="Invalid zone type")
-    
+
     result = await db.execute(
         select(RateCard).where(
             RateCard.name == rate_card_data.name,
@@ -32,7 +39,7 @@ async def create_rate_card(rate_card_data: RateCardCreate, db: AsyncSession = De
     )
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Rate card with this name, order type, and zone type already exists")
-    
+
     rate_card = RateCard(**rate_card_data.model_dump())
     db.add(rate_card)
     await db.commit()
@@ -77,10 +84,10 @@ async def update_rate_card(rate_card_id: UUID, rate_card_data: RateCardUpdate, d
     rate_card = result.scalar_one_or_none()
     if not rate_card:
         raise HTTPException(status_code=404, detail="Rate card not found")
-    
+
     for field, value in rate_card_data.model_dump(exclude_unset=True).items():
         setattr(rate_card, field, value)
-    
+
     await db.commit()
     await db.refresh(rate_card)
     return rate_card
@@ -92,7 +99,7 @@ async def delete_rate_card(rate_card_id: UUID, db: AsyncSession = Depends(get_db
     rate_card = result.scalar_one_or_none()
     if not rate_card:
         raise HTTPException(status_code=404, detail="Rate card not found")
-    
+
     rate_card.is_active = False
     await db.commit()
 
@@ -101,23 +108,23 @@ async def delete_rate_card(rate_card_id: UUID, db: AsyncSession = Depends(get_db
 async def create_rate_card_rule(rate_card_id: UUID, rule_data: RateCardRuleCreate, db: AsyncSession = Depends(get_db), _: str = Depends(require_admin)):
     if rule_data.rate_card_id != rate_card_id:
         raise HTTPException(status_code=400, detail="Rate card ID mismatch")
-    
+
     result = await db.execute(select(RateCard).where(RateCard.id == rate_card_id))
     rate_card = result.scalar_one_or_none()
     if not rate_card:
         raise HTTPException(status_code=404, detail="Rate card not found")
-    
+
     result = await db.execute(select(Zone).where(Zone.id == rule_data.pickup_zone_id))
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Pickup zone not found")
-    
+
     result = await db.execute(select(Zone).where(Zone.id == rule_data.drop_zone_id))
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Drop zone not found")
-    
+
     if rule_data.max_weight_kg is not None and rule_data.max_weight_kg <= rule_data.min_weight_kg:
         raise HTTPException(status_code=400, detail="Max weight must be greater than min weight")
-    
+
     rule = RateCardRule(**rule_data.model_dump())
     db.add(rule)
     await db.commit()
@@ -136,7 +143,7 @@ async def list_rate_card_rules(
     result = await db.execute(select(RateCard).where(RateCard.id == rate_card_id))
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Rate card not found")
-    
+
     query = select(RateCardRule).where(RateCardRule.rate_card_id == rate_card_id)
     query = query.offset(skip).limit(limit).order_by(RateCardRule.min_weight_kg)
     result = await db.execute(query)
@@ -149,16 +156,16 @@ async def update_rate_card_rule(rule_id: UUID, rule_data: RateCardRuleUpdate, db
     rule = result.scalar_one_or_none()
     if not rule:
         raise HTTPException(status_code=404, detail="Rate rule not found")
-    
+
     min_weight = rule_data.min_weight_kg if rule_data.min_weight_kg is not None else rule.min_weight_kg
     max_weight = rule_data.max_weight_kg if rule_data.max_weight_kg is not None else rule.max_weight_kg
-    
+
     if max_weight is not None and max_weight <= min_weight:
         raise HTTPException(status_code=400, detail="Max weight must be greater than min weight")
-    
+
     for field, value in rule_data.model_dump(exclude_unset=True).items():
         setattr(rule, field, value)
-    
+
     await db.commit()
     await db.refresh(rule)
     return rule
@@ -170,7 +177,7 @@ async def delete_rate_card_rule(rule_id: UUID, db: AsyncSession = Depends(get_db
     rule = result.scalar_one_or_none()
     if not rule:
         raise HTTPException(status_code=404, detail="Rate rule not found")
-    
+
     await db.delete(rule)
     await db.commit()
 
@@ -179,18 +186,18 @@ async def delete_rate_card_rule(rule_id: UUID, db: AsyncSession = Depends(get_db
 async def create_cod_surcharge(rate_card_id: UUID, surcharge_data: CODSurchargeCreate, db: AsyncSession = Depends(get_db), _: str = Depends(require_admin)):
     if surcharge_data.rate_card_id != rate_card_id:
         raise HTTPException(status_code=400, detail="Rate card ID mismatch")
-    
+
     result = await db.execute(select(RateCard).where(RateCard.id == rate_card_id))
     rate_card = result.scalar_one_or_none()
     if not rate_card:
         raise HTTPException(status_code=404, detail="Rate card not found")
-    
+
     if surcharge_data.max_order_value is not None and surcharge_data.max_order_value <= surcharge_data.min_order_value:
         raise HTTPException(status_code=400, detail="Max order value must be greater than min order value")
-    
+
     if surcharge_data.max_surcharge is not None and surcharge_data.max_surcharge < surcharge_data.min_surcharge:
         raise HTTPException(status_code=400, detail="Max surcharge must be greater than or equal to min surcharge")
-    
+
     surcharge = CODSurcharge(**surcharge_data.model_dump())
     db.add(surcharge)
     await db.commit()
@@ -210,7 +217,7 @@ async def list_cod_surcharges(
     result = await db.execute(select(RateCard).where(RateCard.id == rate_card_id))
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Rate card not found")
-    
+
     query = select(CODSurcharge).where(CODSurcharge.rate_card_id == rate_card_id)
     if is_active is not None:
         query = query.where(CODSurcharge.is_active == is_active)
@@ -225,22 +232,22 @@ async def update_cod_surcharge(surcharge_id: UUID, surcharge_data: CODSurchargeU
     surcharge = result.scalar_one_or_none()
     if not surcharge:
         raise HTTPException(status_code=404, detail="COD surcharge not found")
-    
+
     min_order = surcharge_data.min_order_value if surcharge_data.min_order_value is not None else surcharge.min_order_value
     max_order = surcharge_data.max_order_value if surcharge_data.max_order_value is not None else surcharge.max_order_value
-    
+
     if max_order is not None and max_order <= min_order:
         raise HTTPException(status_code=400, detail="Max order value must be greater than min order value")
-    
+
     min_surcharge = surcharge_data.min_surcharge if surcharge_data.min_surcharge is not None else surcharge.min_surcharge
     max_surcharge = surcharge_data.max_surcharge if surcharge_data.max_surcharge is not None else surcharge.max_surcharge
-    
+
     if max_surcharge is not None and max_surcharge < min_surcharge:
         raise HTTPException(status_code=400, detail="Max surcharge must be greater than or equal to min surcharge")
-    
+
     for field, value in surcharge_data.model_dump(exclude_unset=True).items():
         setattr(surcharge, field, value)
-    
+
     await db.commit()
     await db.refresh(surcharge)
     return surcharge
@@ -252,6 +259,6 @@ async def delete_cod_surcharge(surcharge_id: UUID, db: AsyncSession = Depends(ge
     surcharge = result.scalar_one_or_none()
     if not surcharge:
         raise HTTPException(status_code=404, detail="COD surcharge not found")
-    
+
     await db.delete(surcharge)
     await db.commit()

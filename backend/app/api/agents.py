@@ -1,19 +1,23 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import List, Optional
+from uuid import UUID, uuid4
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-from uuid import UUID, uuid4
-from typing import List, Optional
-from app.db.session import get_db
-from app.services.agent import AgentService, get_agent_service
+
+from app.api.deps import require_admin, require_agent
+from app.models import AgentStatus, User
 from app.schemas.agent import (
-    AgentProfileCreate, AgentProfileUpdate, AgentProfileResponse,
-    AgentLocationUpdate, AgentLocationResponse,
-    AgentAvailabilityUpdate, AssignmentRequest, AssignmentResponse,
-    NearbyAgent
+    AgentAvailabilityUpdate,
+    AgentLocationResponse,
+    AgentLocationUpdate,
+    AgentProfileCreate,
+    AgentProfileResponse,
+    AgentProfileUpdate,
+    AssignmentRequest,
+    AssignmentResponse,
 )
-from app.api.deps import require_agent, require_admin, get_current_user
-from app.models import User, UserRole, AgentStatus, OrderStatus, Agent
+from app.services.agent import AgentService, get_agent_service
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 
@@ -33,7 +37,7 @@ async def create_agent_profile(
     existing = result.scalar_one_or_none()
     if existing:
         raise HTTPException(status_code=400, detail="Agent profile already exists")
-    
+
     agent = Agent(
         id=uuid4(),
         user_id=current_user.id,
@@ -63,7 +67,7 @@ async def get_my_profile(
     agent = result.scalar_one_or_none()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent profile not found")
-    
+
     # Build response with user info
     return AgentProfileResponse(
         id=agent.id,
@@ -96,10 +100,10 @@ async def update_my_profile(
     agent = result.scalar_one_or_none()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent profile not found")
-    
+
     for field, value in profile_data.model_dump(exclude_unset=True).items():
         setattr(agent, field, value)
-    
+
     await agent_service.db.commit()
     await agent_service.db.refresh(agent)
     return agent
@@ -119,7 +123,7 @@ async def update_availability(
     agent = result.scalar_one_or_none()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent profile not found")
-    
+
     agent.status = availability.status
     await agent_service.db.commit()
     await agent_service.db.refresh(agent)
@@ -140,7 +144,7 @@ async def update_location(
     agent = result.scalar_one_or_none()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent profile not found")
-    
+
     updated_location = await agent_service.update_agent_location(
         agent_id=agent.id,
         latitude=location.latitude,
@@ -163,7 +167,7 @@ async def get_dashboard(
     agent = result.scalar_one_or_none()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent profile not found")
-    
+
     dashboard = await agent_service.get_agent_dashboard(agent.id)
     return dashboard
 
@@ -201,18 +205,18 @@ async def list_agents(
     """List all agents (admin only)"""
     from app.models import Agent
     query = select(Agent).options(selectinload(Agent.user))
-    
+
     if status:
         query = query.where(Agent.status == status)
     if zone_id:
         query = query.where(Agent.zone_id == zone_id)
     if is_active is not None:
         query = query.where(Agent.is_active == is_active)
-    
+
     query = query.offset(skip).limit(limit).order_by(Agent.created_at.desc())
     result = await agent_service.db.execute(query)
     agents = result.scalars().all()
-    
+
     return [
         AgentProfileResponse(
             id=a.id,
@@ -252,7 +256,7 @@ async def assign_order(
         result = await agent_service.auto_assign_order(assignment.order_id)
         if not result:
             raise HTTPException(status_code=404, detail="No available agents found")
-    
+
     return result
 
 
@@ -290,11 +294,11 @@ async def complete_delivery(
     agent = result.scalar_one_or_none()
     if not agent or agent.id != agent_id:
         raise HTTPException(status_code=403, detail="Not authorized for this agent")
-    
+
     success = await agent_service.complete_delivery(order_id, agent_id)
     if not success:
         raise HTTPException(status_code=404, detail="Order not found")
-    
+
     return {"success": True, "message": "Delivery completed"}
 
 
@@ -312,7 +316,7 @@ async def get_agent(
     agent = result.scalar_one_or_none()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
-    
+
     return AgentProfileResponse(
         id=agent.id,
         user_id=agent.user_id,
@@ -342,7 +346,7 @@ async def deactivate_agent(
     agent = result.scalar_one_or_none()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
-    
+
     agent.is_active = False
     agent.status = AgentStatus.OFFLINE
     await agent_service.db.commit()

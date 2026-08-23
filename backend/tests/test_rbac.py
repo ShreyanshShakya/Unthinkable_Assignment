@@ -1,8 +1,9 @@
-import pytest
-from httpx import AsyncClient, ASGITransport
-from app.main import app
-from app.models import UserRole
 from uuid import uuid4
+
+import pytest
+from httpx import ASGITransport, AsyncClient
+
+from app.main import app
 
 
 @pytest.fixture

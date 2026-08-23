@@ -6,8 +6,9 @@ Create Date: 2026-08-19 22:30:00.000000
 
 """
 from typing import Sequence, Union
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
@@ -349,7 +350,7 @@ def downgrade() -> None:
     op.drop_table('zones')
     op.drop_index('ix_users_email_role', table_name='users')
     op.drop_table('users')
-    
+
     # Drop enum types
     op.execute('DROP TYPE IF EXISTS userrole')
     op.execute('DROP TYPE IF EXISTS ordertype')

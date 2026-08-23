@@ -1,7 +1,8 @@
-from pydantic import BaseModel, Field
 from typing import Optional
 from uuid import UUID
-from decimal import Decimal
+
+from pydantic import BaseModel, Field
+
 from app.models import OrderType, PaymentType, ZoneType
 
 

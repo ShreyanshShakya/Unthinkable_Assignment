@@ -1,10 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.session import get_db
-from app.services.pricing import PricingEngine, get_pricing_engine
-from app.schemas.pricing import PricingRequest, PricingResponse, QuoteRequest, QuoteResponse
-from app.api.deps import require_customer, require_agent, require_admin
+from fastapi import APIRouter, Depends
+
+from app.api.deps import require_customer
 from app.models import User
+from app.schemas.pricing import PricingRequest, PricingResponse, QuoteRequest, QuoteResponse
+from app.services.pricing import PricingEngine, get_pricing_engine
 
 router = APIRouter(prefix="/pricing", tags=["pricing"])
 
@@ -17,10 +16,10 @@ async def calculate_price(
 ):
     """Calculate price for given parameters (requires zone IDs)"""
     result = await pricing_engine.calculate_price(request)
-    
+
     if not result["success"]:
         return PricingResponse(success=False, error=result["error"])
-    
+
     breakdown = result["breakdown"]
     return PricingResponse(
         success=True,
@@ -46,10 +45,10 @@ async def get_quote(
 ):
     """Get price quote with automatic zone detection from pincodes"""
     result = await pricing_engine.calculate_quote(request)
-    
+
     if not result["success"]:
         return QuoteResponse(success=False, error=result["error"])
-    
+
     breakdown = result["breakdown"]
     return QuoteResponse(
         success=True,
@@ -76,13 +75,14 @@ async def list_active_rate_cards(
 ):
     """List all active rate cards for reference"""
     from sqlalchemy import select
+
     from app.models import RateCard
-    
+
     result = await pricing_engine.db.execute(
         select(RateCard).where(RateCard.is_active == True)
     )
     rate_cards = result.scalars().all()
-    
+
     return [
         {
             "id": str(rc.id),

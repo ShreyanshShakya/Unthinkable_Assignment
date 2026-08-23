@@ -1,20 +1,18 @@
 import os
-os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
+os.environ["DATABASE_URL"] = "postgresql+asyncpg://postgres:postgres@localhost:5432/test_lastmile"
 os.environ["ENVIRONMENT"] = "test"
+os.environ["SECRET_KEY"] = "test-secret-key-for-testing-only-min-32-chars-long"
 
 import pytest
 import asyncio
 from contextlib import asynccontextmanager
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import NullPool
-from sqlalchemy import event
 from app.db.base import Base
 from app.main import app
 from app.db.session import get_db, init_db
 from httpx import AsyncClient, ASGITransport
-
-
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+from testcontainers.postgres import PostgresContainer
 
 
 @pytest.fixture(scope="session")
@@ -25,14 +23,15 @@ def event_loop():
 
 
 @pytest.fixture(scope="session")
-async def test_engine():
-    eng = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool, echo=False, connect_args={"check_same_thread": False})
-    
-    @event.listens_for(eng.sync_engine, "connect")
-    def set_sqlite_pragma(dbapi_connection, connection_record):
-        cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.close()
+def postgres_container():
+    """Start a PostgreSQL container for testing"""
+    with PostgresContainer("postgres:15") as postgres:
+        yield postgres.get_connection_url()
+
+
+@pytest.fixture(scope="session")
+async def test_engine(postgres_container):
+    eng = create_async_engine(postgres_container, poolclass=NullPool, echo=False)
     
     async with eng.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

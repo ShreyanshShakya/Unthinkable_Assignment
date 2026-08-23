@@ -179,7 +179,7 @@ class AgentService:
         return nearby[:limit]
     
     async def auto_assign_order(self, order_id: UUID) -> Optional[DeliveryAssignment]:
-        """Auto-assign order to nearest available agent"""
+        """Auto-assign order to nearest available agent using zone→distance→load algorithm"""
         order = await self.order_service.get_order(order_id)
         if not order:
             raise ValueError("Order not found")
@@ -190,30 +190,103 @@ class AgentService:
         if order.agent_id:
             raise ValueError("Order already assigned")
         
-        # Get pickup location (for MVP, use zone center or address geocoding)
-        # For now, we'll find agents in the same zone
         pickup_zone_id = order.pickup_zone_id
         if not pickup_zone_id:
             raise ValueError("Pickup zone not determined")
         
-        # Find available agents in the same zone
+        # Get pickup zone for coordinates
+        result = await self.db.execute(select(Zone).where(Zone.id == pickup_zone_id))
+        pickup_zone = result.scalar_one_or_none()
+        if not pickup_zone:
+            raise ValueError("Pickup zone not found")
+        
+        # For MVP, we'll use a default center coordinate for the zone
+        # In production, this would come from zone geometry/center
+        pickup_lat = 28.6139  # Default Delhi coordinates - in production from zone center
+        pickup_lon = 77.2090
+        
+        # First, try to find agents in the same zone
         result = await self.db.execute(
-            select(Agent, User)
+            select(Agent, AgentLocation, User)
             .join(User, User.id == Agent.user_id)
+            .outerjoin(AgentLocation, AgentLocation.agent_id == Agent.id)
             .where(Agent.zone_id == pickup_zone_id)
             .where(Agent.status == AgentStatus.AVAILABLE)
             .where(Agent.is_active == True)
             .where(User.is_active == True)
             .where(Agent.current_deliveries_count < Agent.max_concurrent_deliveries)
-            .order_by(Agent.current_deliveries_count.asc())  # Least busy first
         )
-        rows = result.all()
+        same_zone_rows = result.all()
         
-        if not rows:
+        candidates = []
+        
+        # Add same-zone agents with distance calculation
+        for agent, location, user in same_zone_rows:
+            if location:
+                distance = self._calculate_distance(
+                    pickup_lat, pickup_lon,
+                    float(location.latitude), float(location.longitude)
+                )
+            else:
+                # If no location, use a default large distance but still prefer same zone
+                distance = 50.0
+            
+            candidates.append({
+                'agent': agent,
+                'user': user,
+                'distance_km': distance,
+                'zone_affinity': 0,  # Same zone = 0 (highest priority)
+                'current_load': agent.current_deliveries_count,
+                'max_load': agent.max_concurrent_deliveries,
+            })
+        
+        # If no candidates in same zone, search nearby zones
+        if not candidates:
+            result = await self.db.execute(
+                select(Agent, AgentLocation, User, Zone)
+                .join(User, User.id == Agent.user_id)
+                .outerjoin(AgentLocation, AgentLocation.agent_id == Agent.id)
+                .join(Zone, Zone.id == Agent.zone_id)
+                .where(Agent.zone_id != pickup_zone_id)
+                .where(Agent.status == AgentStatus.AVAILABLE)
+                .where(Agent.is_active == True)
+                .where(User.is_active == True)
+                .where(Agent.current_deliveries_count < Agent.max_concurrent_deliveries)
+            )
+            nearby_rows = result.all()
+            
+            for agent, location, user, zone in nearby_rows:
+                if location:
+                    distance = self._calculate_distance(
+                        pickup_lat, pickup_lon,
+                        float(location.latitude), float(location.longitude)
+                    )
+                else:
+                    distance = 100.0
+                
+                candidates.append({
+                    'agent': agent,
+                    'user': user,
+                    'distance_km': distance,
+                    'zone_affinity': 1,  # Different zone = 1 (lower priority)
+                    'current_load': agent.current_deliveries_count,
+                    'max_load': agent.max_concurrent_deliveries,
+                })
+        
+        if not candidates:
             return None
         
-        # Assign to least busy agent
-        agent, user = rows[0]
+        # Sort by: zone_affinity (same zone first) -> distance -> current_load
+        candidates.sort(key=lambda x: (x['zone_affinity'], x['distance_km'], x['current_load']))
+        
+        # Pick the best candidate
+        best = candidates[0]
+        agent = best['agent']
+        user = best['user']
+        
+        # Check capacity before assignment
+        if agent.current_deliveries_count >= agent.max_concurrent_deliveries:
+            return None
         
         # Create assignment
         assignment = DeliveryAssignment(
@@ -227,7 +300,7 @@ class AgentService:
         
         # Update order and agent
         order.agent_id = agent.user_id
-        order.status = OrderStatus.PICKED_UP
+        order.status = OrderStatus.ASSIGNED
         agent.current_deliveries_count += 1
         agent.status = AgentStatus.BUSY
         
@@ -237,10 +310,10 @@ class AgentService:
             id=uuid4(),
             order_id=order.id,
             old_status=OrderStatus.CREATED,
-            new_status=OrderStatus.PICKED_UP,
+            new_status=OrderStatus.ASSIGNED,
             actor_id=agent.user_id,
             actor_role=UserRole.AGENT,
-            reason=f"Auto-assigned to agent {user.full_name}"
+            reason=f"Auto-assigned to agent {user.full_name} (distance: {best['distance_km']:.1f}km)"
         )
         self.db.add(history)
         
@@ -275,6 +348,10 @@ class AgentService:
         if not agent.is_active:
             raise ValueError("Agent is not active")
         
+        # Check capacity before assignment
+        if agent.current_deliveries_count >= agent.max_concurrent_deliveries:
+            raise ValueError("Agent has reached maximum concurrent deliveries")
+        
         # Create assignment
         assignment = DeliveryAssignment(
             id=uuid4(),
@@ -287,7 +364,7 @@ class AgentService:
         
         # Update order and agent
         order.agent_id = agent.user_id
-        order.status = OrderStatus.PICKED_UP
+        order.status = OrderStatus.ASSIGNED
         agent.current_deliveries_count += 1
         agent.status = AgentStatus.BUSY
         
@@ -297,7 +374,7 @@ class AgentService:
             id=uuid4(),
             order_id=order.id,
             old_status=OrderStatus.CREATED,
-            new_status=OrderStatus.PICKED_UP,
+            new_status=OrderStatus.ASSIGNED,
             actor_id=admin_id,
             actor_role=UserRole.ADMIN,
             reason=f"Manually assigned to agent"

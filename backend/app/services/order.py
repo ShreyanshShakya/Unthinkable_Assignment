@@ -249,7 +249,8 @@ class OrderService:
     def _is_valid_transition(self, current: OrderStatus, new: OrderStatus) -> bool:
         """Validate status transition"""
         valid_transitions = {
-            OrderStatus.CREATED: [OrderStatus.PICKED_UP, OrderStatus.CANCELLED],
+            OrderStatus.CREATED: [OrderStatus.ASSIGNED, OrderStatus.CANCELLED],
+            OrderStatus.ASSIGNED: [OrderStatus.PICKED_UP, OrderStatus.CANCELLED],
             OrderStatus.PICKED_UP: [OrderStatus.IN_TRANSIT, OrderStatus.CANCELLED],
             OrderStatus.IN_TRANSIT: [OrderStatus.OUT_FOR_DELIVERY, OrderStatus.CANCELLED],
             OrderStatus.OUT_FOR_DELIVERY: [OrderStatus.DELIVERED, OrderStatus.FAILED],

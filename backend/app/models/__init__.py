@@ -29,6 +29,7 @@ class PaymentType(str, enum.Enum):
 
 class OrderStatus(str, enum.Enum):
     CREATED = "created"
+    ASSIGNED = "assigned"
     PICKED_UP = "picked_up"
     IN_TRANSIT = "in_transit"
     OUT_FOR_DELIVERY = "out_for_delivery"

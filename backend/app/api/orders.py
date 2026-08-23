@@ -1,15 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from uuid import UUID
 from typing import List, Optional
-from app.db.session import get_db
-from app.services.order import OrderService, get_order_service
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+
+from app.api.deps import get_current_user, require_customer
+from app.models import OrderStatus, User, UserRole
 from app.schemas.order import (
-    OrderCreate, OrderUpdate, OrderStatusUpdate, OrderResponse, 
-    OrderStatusHistoryResponse, OrderListResponse
+    OrderCreate,
+    OrderListResponse,
+    OrderResponse,
+    OrderStatusHistoryResponse,
+    OrderStatusUpdate,
+    OrderUpdate,
 )
-from app.api.deps import require_customer, require_agent, require_admin, get_current_user
-from app.models import User, UserRole, OrderStatus
+from app.services.order import OrderService, get_order_service
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -25,7 +29,7 @@ async def get_quote(
         # Use pricing engine directly for quote
         from app.services.pricing import PricingEngine
         pricing_engine = PricingEngine(order_service.db)
-        
+
         from app.schemas.pricing import QuoteRequest
         quote_request = QuoteRequest(
             length_cm=order_data.length_cm,
@@ -42,14 +46,14 @@ async def get_quote(
             drop_state=order_data.drop_state,
             order_value=order_data.order_value
         )
-        
+
         result = await pricing_engine.calculate_quote(quote_request)
-        
+
         if not result["success"]:
             raise HTTPException(status_code=400, detail=result["error"])
-        
+
         return result
-        
+
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -81,12 +85,12 @@ async def list_orders(
     """List orders with filters (customers see only their orders)"""
     customer_id = current_user.id if current_user.role == UserRole.CUSTOMER else None
     agent_id = current_user.id if current_user.role == UserRole.AGENT else None
-    
+
     # Admin can filter by customer_id and agent_id via query params
     if current_user.role == UserRole.ADMIN:
         customer_id = None
         agent_id = None
-    
+
     orders, total = await order_service.list_orders(
         customer_id=customer_id,
         agent_id=agent_id,
@@ -96,7 +100,7 @@ async def list_orders(
         skip=skip,
         limit=limit
     )
-    
+
     return OrderListResponse(
         orders=orders,
         total=total,
@@ -116,13 +120,13 @@ async def get_order(
     order = await order_service.get_order(order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    
+
     # Authorization check
     if current_user.role == UserRole.CUSTOMER and order.customer_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
     if current_user.role == UserRole.AGENT and order.agent_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
-    
+
     return order
 
 
@@ -136,12 +140,12 @@ async def get_order_by_number(
     order = await order_service.get_order_by_number(order_number)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    
+
     if current_user.role == UserRole.CUSTOMER and order.customer_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
     if current_user.role == UserRole.AGENT and order.agent_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
-    
+
     return order
 
 
@@ -157,7 +161,7 @@ async def update_order_status(
     order = await order_service.get_order(order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    
+
     if current_user.role == UserRole.CUSTOMER:
         # Customers can only cancel their own orders
         if order.customer_id != current_user.id:
@@ -171,7 +175,7 @@ async def update_order_status(
         # Agents cannot cancel
         if status_update.status == OrderStatus.CANCELLED:
             raise HTTPException(status_code=403, detail="Agents cannot cancel orders")
-    
+
     try:
         updated_order = await order_service.update_order_status(
             order_id=order_id,
@@ -195,12 +199,12 @@ async def get_order_tracking(
     order = await order_service.get_order(order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    
+
     if current_user.role == UserRole.CUSTOMER and order.customer_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
     if current_user.role == UserRole.AGENT and order.agent_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
-    
+
     history = await order_service.get_status_history(order_id)
     return history
 
@@ -216,13 +220,13 @@ async def update_order(
     order = await order_service.get_order(order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    
+
     if order.customer_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
-    
+
     if order.status != OrderStatus.CREATED:
         raise HTTPException(status_code=400, detail="Can only update orders in CREATED status")
-    
+
     # Recalculate price if address or weight changed
     from app.schemas.pricing import PricingRequest
     pricing_request = PricingRequest(
@@ -236,15 +240,15 @@ async def update_order(
         drop_zone_id=order.drop_zone_id,
         order_value=order.order_value
     )
-    
+
     pricing_engine = order_service.pricing_engine
     pricing_result = await pricing_engine.calculate_price(pricing_request)
-    
+
     if not pricing_result["success"]:
         raise HTTPException(status_code=400, detail=pricing_result["error"])
-    
+
     breakdown = pricing_result["breakdown"]
-    
+
     # Update fields
     if order_update.pickup_address:
         order.pickup_address = order_update.pickup_address
@@ -252,14 +256,14 @@ async def update_order(
         order.drop_address = order_update.drop_address
     if order_update.order_value is not None:
         order.order_value = order_update.order_value
-    
+
     order.base_charge = breakdown["base_charge"]
     order.cod_surcharge = breakdown["cod_surcharge"]
     order.total_charge = breakdown["total_charge"]
-    
+
     await order_service.db.commit()
     await order_service.db.refresh(order)
-    
+
     return order
 
 
@@ -273,13 +277,13 @@ async def cancel_order(
     order = await order_service.get_order(order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    
+
     if current_user.role == UserRole.CUSTOMER and order.customer_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized")
-    
+
     if order.status not in [OrderStatus.CREATED, OrderStatus.PICKED_UP]:
         raise HTTPException(status_code=400, detail="Cannot cancel order in current status")
-    
+
     await order_service.update_order_status(
         order_id=order_id,
         new_status=OrderStatus.CANCELLED,

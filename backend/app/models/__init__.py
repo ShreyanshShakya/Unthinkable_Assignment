@@ -1,13 +1,25 @@
 import enum
-from datetime import datetime
-from decimal import Decimal
-from sqlalchemy import (
-    Column, String, Integer, Boolean, DateTime, Enum, ForeignKey, 
-    Numeric, Text, Index, UniqueConstraint, CheckConstraint, JSON
-)
-from sqlalchemy.orm import relationship, declared_attr
-from sqlalchemy.dialects.postgresql import UUID
 import uuid
+from datetime import datetime
+
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    CheckConstraint,
+    Column,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
 from app.db.base import Base
 
 
@@ -58,7 +70,7 @@ class DeliveryAttemptStatus(str, enum.Enum):
 
 class User(Base):
     __tablename__ = "users"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email = Column(String(255), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
@@ -68,14 +80,14 @@ class User(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    
+
     # Relationships
     orders = relationship("Order", back_populates="customer", foreign_keys="Order.customer_id")
     assigned_orders = relationship("Order", back_populates="agent", foreign_keys="Order.agent_id")
     agent_profile = relationship("Agent", back_populates="user", uselist=False)
     status_history = relationship("OrderStatusHistory", back_populates="actor")
     notifications = relationship("Notification", back_populates="user")
-    
+
     __table_args__ = (
         Index("ix_users_email_role", "email", "role"),
     )
@@ -83,7 +95,7 @@ class User(Base):
 
 class Zone(Base):
     __tablename__ = "zones"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(100), unique=True, nullable=False)
     code = Column(String(20), unique=True, nullable=False, index=True)
@@ -93,7 +105,7 @@ class Zone(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    
+
     # Relationships
     areas = relationship("ZoneArea", back_populates="zone", cascade="all, delete-orphan")
     pickup_rates = relationship("RateCardRule", back_populates="pickup_zone", foreign_keys="RateCardRule.pickup_zone_id")
@@ -103,7 +115,7 @@ class Zone(Base):
 
 class ZoneArea(Base):
     __tablename__ = "zone_areas"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     zone_id = Column(UUID(as_uuid=True), ForeignKey("zones.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String(100), nullable=False)
@@ -113,10 +125,10 @@ class ZoneArea(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    
+
     # Relationships
     zone = relationship("Zone", back_populates="areas")
-    
+
     __table_args__ = (
         UniqueConstraint("zone_id", "pincode", name="uq_zone_pincode"),
         Index("ix_zone_areas_pincode_city", "pincode", "city"),
@@ -125,7 +137,7 @@ class ZoneArea(Base):
 
 class RateCard(Base):
     __tablename__ = "rate_cards"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(100), nullable=False)
     order_type = Column(Enum(OrderType), nullable=False, index=True)
@@ -135,11 +147,11 @@ class RateCard(Base):
     effective_to = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    
+
     # Relationships
     rules = relationship("RateCardRule", back_populates="rate_card", cascade="all, delete-orphan")
     cod_surcharges = relationship("CODSurcharge", back_populates="rate_card", cascade="all, delete-orphan")
-    
+
     __table_args__ = (
         UniqueConstraint("name", "order_type", "zone_type", name="uq_rate_card_name_type"),
         Index("ix_rate_cards_type_zone_active", "order_type", "zone_type", "is_active"),
@@ -148,7 +160,7 @@ class RateCard(Base):
 
 class RateCardRule(Base):
     __tablename__ = "rate_card_rules"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     rate_card_id = Column(UUID(as_uuid=True), ForeignKey("rate_cards.id", ondelete="CASCADE"), nullable=False, index=True)
     pickup_zone_id = Column(UUID(as_uuid=True), ForeignKey("zones.id"), nullable=False, index=True)
@@ -159,12 +171,12 @@ class RateCardRule(Base):
     per_kg_charge = Column(Numeric(10, 2), nullable=False, default=0)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    
+
     # Relationships
     rate_card = relationship("RateCard", back_populates="rules")
     pickup_zone = relationship("Zone", back_populates="pickup_rates", foreign_keys=[pickup_zone_id])
     drop_zone = relationship("Zone", back_populates="drop_rates", foreign_keys=[drop_zone_id])
-    
+
     __table_args__ = (
         CheckConstraint("min_weight_kg >= 0", name="ck_min_weight_positive"),
         CheckConstraint("max_weight_kg IS NULL OR max_weight_kg > min_weight_kg", name="ck_max_weight_greater"),
@@ -176,7 +188,7 @@ class RateCardRule(Base):
 
 class CODSurcharge(Base):
     __tablename__ = "cod_surcharges"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     rate_card_id = Column(UUID(as_uuid=True), ForeignKey("rate_cards.id", ondelete="CASCADE"), nullable=False, index=True)
     min_order_value = Column(Numeric(10, 2), nullable=False, default=0)
@@ -187,10 +199,10 @@ class CODSurcharge(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    
+
     # Relationships
     rate_card = relationship("RateCard", back_populates="cod_surcharges")
-    
+
     __table_args__ = (
         CheckConstraint("surcharge_percentage >= 0 AND surcharge_percentage <= 100", name="ck_surcharge_percentage"),
         CheckConstraint("min_surcharge >= 0", name="ck_min_surcharge_positive"),
@@ -202,26 +214,26 @@ class CODSurcharge(Base):
 
 class Order(Base):
     __tablename__ = "orders"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     order_number = Column(String(30), unique=True, nullable=False, index=True)
     customer_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
     agent_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True)
-    
+
     # Pickup details
     pickup_address = Column(Text, nullable=False)
     pickup_pincode = Column(String(10), nullable=False, index=True)
     pickup_city = Column(String(100), nullable=True)
     pickup_state = Column(String(100), nullable=True)
     pickup_zone_id = Column(UUID(as_uuid=True), ForeignKey("zones.id"), nullable=True, index=True)
-    
+
     # Drop details
     drop_address = Column(Text, nullable=False)
     drop_pincode = Column(String(10), nullable=False, index=True)
     drop_city = Column(String(100), nullable=True)
     drop_state = Column(String(100), nullable=True)
     drop_zone_id = Column(UUID(as_uuid=True), ForeignKey("zones.id"), nullable=True, index=True)
-    
+
     # Package details
     length_cm = Column(Numeric(10, 2), nullable=False)
     breadth_cm = Column(Numeric(10, 2), nullable=False)
@@ -229,27 +241,27 @@ class Order(Base):
     actual_weight_kg = Column(Numeric(10, 3), nullable=False)
     volumetric_weight_kg = Column(Numeric(10, 3), nullable=False)
     billable_weight_kg = Column(Numeric(10, 3), nullable=False)
-    
+
     # Order classification
     order_type = Column(Enum(OrderType), nullable=False, index=True)
     payment_type = Column(Enum(PaymentType), nullable=False, index=True)
     zone_type = Column(Enum(ZoneType), nullable=False)
-    
+
     # Pricing (snapshot at creation)
     base_charge = Column(Numeric(10, 2), nullable=False)
     cod_surcharge = Column(Numeric(10, 2), nullable=False, default=0)
     total_charge = Column(Numeric(10, 2), nullable=False)
-    
+
     # Status
     status = Column(Enum(OrderStatus), default=OrderStatus.CREATED, nullable=False, index=True)
     failure_reason = Column(Text, nullable=True)
-    
+
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     picked_up_at = Column(DateTime, nullable=True)
     delivered_at = Column(DateTime, nullable=True)
-    
+
     # Relationships
     customer = relationship("User", back_populates="orders", foreign_keys=[customer_id])
     agent = relationship("User", back_populates="assigned_orders", foreign_keys=[agent_id])
@@ -259,7 +271,7 @@ class Order(Base):
     delivery_attempts = relationship("DeliveryAttempt", back_populates="order", cascade="all, delete-orphan")
     assignment = relationship("DeliveryAssignment", back_populates="order", uselist=False)
     reschedule_requests = relationship("RescheduleRequest", back_populates="order", cascade="all, delete-orphan")
-    
+
     __table_args__ = (
         CheckConstraint("actual_weight_kg > 0", name="ck_actual_weight_positive"),
         CheckConstraint("billable_weight_kg >= actual_weight_kg", name="ck_billable_weight"),
@@ -272,7 +284,7 @@ class Order(Base):
 
 class OrderStatusHistory(Base):
     __tablename__ = "order_status_history"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     order_id = Column(UUID(as_uuid=True), ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True)
     old_status = Column(Enum(OrderStatus), nullable=True)
@@ -282,11 +294,11 @@ class OrderStatusHistory(Base):
     reason = Column(Text, nullable=True)
     context_data = Column(JSON, nullable=True)  # Additional context (location, etc.)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
-    
+
     # Relationships
     order = relationship("Order", back_populates="status_history")
     actor = relationship("User", back_populates="status_history")
-    
+
     __table_args__ = (
         Index("ix_status_history_order_created", "order_id", "created_at"),
     )
@@ -294,7 +306,7 @@ class OrderStatusHistory(Base):
 
 class Agent(Base):
     __tablename__ = "agents"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
     employee_id = Column(String(50), unique=True, nullable=False, index=True)
@@ -305,7 +317,7 @@ class Agent(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    
+
     # Relationships
     user = relationship("User", back_populates="agent_profile")
     zone = relationship("Zone", back_populates="agents")
@@ -315,7 +327,7 @@ class Agent(Base):
 
 class AgentLocation(Base):
     __tablename__ = "agent_locations"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     agent_id = Column(UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), unique=True, nullable=False)
     latitude = Column(Numeric(10, 8), nullable=False)
@@ -323,7 +335,7 @@ class AgentLocation(Base):
     accuracy_meters = Column(Integer, nullable=True)
     zone_id = Column(UUID(as_uuid=True), ForeignKey("zones.id"), nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    
+
     # Relationships
     agent = relationship("Agent", back_populates="location")
     zone = relationship("Zone")
@@ -331,7 +343,7 @@ class AgentLocation(Base):
 
 class DeliveryAssignment(Base):
     __tablename__ = "delivery_assignments"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     order_id = Column(UUID(as_uuid=True), ForeignKey("orders.id", ondelete="CASCADE"), unique=True, nullable=False)
     agent_id = Column(UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -341,7 +353,7 @@ class DeliveryAssignment(Base):
     is_auto_assigned = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    
+
     # Relationships
     order = relationship("Order", back_populates="assignment")
     agent = relationship("Agent", back_populates="assignments")
@@ -350,7 +362,7 @@ class DeliveryAssignment(Base):
 
 class DeliveryAttempt(Base):
     __tablename__ = "delivery_attempts"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     order_id = Column(UUID(as_uuid=True), ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True)
     agent_id = Column(UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -364,11 +376,11 @@ class DeliveryAttempt(Base):
     completed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    
+
     # Relationships
     order = relationship("Order", back_populates="delivery_attempts")
     agent = relationship("Agent")
-    
+
     __table_args__ = (
         UniqueConstraint("order_id", "attempt_number", name="uq_order_attempt"),
         Index("ix_delivery_attempts_order_agent", "order_id", "agent_id"),
@@ -377,7 +389,7 @@ class DeliveryAttempt(Base):
 
 class Notification(Base):
     __tablename__ = "notifications"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     order_id = Column(UUID(as_uuid=True), ForeignKey("orders.id", ondelete="SET NULL"), nullable=True, index=True)
@@ -389,11 +401,11 @@ class Notification(Base):
     error_message = Column(Text, nullable=True)
     sent_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    
+
     # Relationships
     user = relationship("User", back_populates="notifications")
     order = relationship("Order")
-    
+
     __table_args__ = (
         Index("ix_notifications_user_created", "user_id", "created_at"),
         Index("ix_notifications_order_type", "order_id", "type"),
@@ -402,7 +414,7 @@ class Notification(Base):
 
 class RescheduleRequest(Base):
     __tablename__ = "reschedule_requests"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     order_id = Column(UUID(as_uuid=True), ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True)
     customer_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
@@ -415,13 +427,13 @@ class RescheduleRequest(Base):
     new_delivery_attempt_id = Column(UUID(as_uuid=True), ForeignKey("delivery_attempts.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    
+
     # Relationships
     order = relationship("Order", back_populates="reschedule_requests")
     customer = relationship("User", foreign_keys=[customer_id])
     approved_by_user = relationship("User", foreign_keys=[approved_by])
     new_delivery_attempt = relationship("DeliveryAttempt")
-    
+
     __table_args__ = (
         Index("ix_reschedule_order_status", "order_id", "status"),
     )

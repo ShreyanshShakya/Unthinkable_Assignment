@@ -1,8 +1,9 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List
-from uuid import UUID
 from datetime import datetime
-from decimal import Decimal
+from typing import Optional
+from uuid import UUID
+
+from pydantic import BaseModel, Field
+
 from app.models import AgentStatus
 
 
@@ -29,12 +30,12 @@ class AgentProfileResponse(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
-    
+
     # User info
     user_email: Optional[str] = None
     user_name: Optional[str] = None
     user_phone: Optional[str] = None
-    
+
     class Config:
         from_attributes = True
 
@@ -53,7 +54,7 @@ class AgentLocationResponse(BaseModel):
     accuracy_meters: Optional[int]
     zone_id: Optional[UUID]
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -75,7 +76,7 @@ class AssignmentResponse(BaseModel):
     assigned_at: datetime
     accepted_at: Optional[datetime]
     is_auto_assigned: bool
-    
+
     class Config:
         from_attributes = True
 
@@ -88,6 +89,6 @@ class NearbyAgent(BaseModel):
     current_deliveries: int
     max_deliveries: int
     status: AgentStatus
-    
+
     class Config:
         from_attributes = True

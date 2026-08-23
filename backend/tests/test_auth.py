@@ -1,7 +1,7 @@
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
+
 from app.main import app
-from app.models import UserRole
 
 
 @pytest.fixture
@@ -100,7 +100,7 @@ async def test_refresh_token(client):
         "password": "password123"
     })
     refresh_token = login_resp.json()["refresh_token"]
-    
+
     response = await client.post("/api/auth/refresh", json={
         "refresh_token": refresh_token
     })

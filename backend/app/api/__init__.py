@@ -1,12 +1,13 @@
 from fastapi import APIRouter
-from app.api.auth import router as auth_router
-from app.api.admin_zones import router as admin_zones_router
+
 from app.api.admin_rates import router as admin_rates_router
-from app.api.zone_detection import router as zone_detection_router
-from app.api.pricing import router as pricing_router
-from app.api.orders import router as orders_router
+from app.api.admin_zones import router as admin_zones_router
 from app.api.agents import router as agents_router
+from app.api.auth import router as auth_router
 from app.api.failed_deliveries import router as failed_deliveries_router
+from app.api.orders import router as orders_router
+from app.api.pricing import router as pricing_router
+from app.api.zone_detection import router as zone_detection_router
 
 api_router = APIRouter()
 api_router.include_router(auth_router)

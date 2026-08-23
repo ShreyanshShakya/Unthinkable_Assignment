@@ -1,7 +1,9 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List
-from uuid import UUID
 from datetime import datetime
+from typing import Optional
+from uuid import UUID
+
+from pydantic import BaseModel, Field
+
 from app.models import DeliveryAttemptStatus
 
 
@@ -29,7 +31,7 @@ class RescheduleRequestResponse(BaseModel):
     new_delivery_attempt_id: Optional[UUID]
     created_at: datetime
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -63,7 +65,7 @@ class DeliveryAttemptResponse(BaseModel):
     completed_at: Optional[datetime]
     created_at: datetime
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
 

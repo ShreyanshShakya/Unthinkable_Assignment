@@ -1,8 +1,9 @@
-import pytest
-from httpx import AsyncClient, ASGITransport
-from app.main import app
-from app.models import OrderType, PaymentType, OrderStatus
 from uuid import uuid4
+
+import pytest
+from httpx import ASGITransport, AsyncClient
+
+from app.main import app
 
 
 @pytest.fixture
@@ -26,14 +27,14 @@ class TestOrderLifecycle:
             "role": "customer"
         })
         assert register_resp.status_code == 201
-        
+
         login_resp = await client.post("/api/auth/login", json={
             "email": "customer_test@example.com",
             "password": "password123"
         })
         assert login_resp.status_code == 200
         token = login_resp.json()["access_token"]
-        
+
         # Create order
         headers = {"Authorization": f"Bearer {token}"}
         response = await client.post("/api/orders", json={
@@ -51,7 +52,7 @@ class TestOrderLifecycle:
             "payment_type": "prepaid",
             "order_value": 0
         }, headers=headers)
-        
+
         assert response.status_code == 201
         data = response.json()
         assert data["order_number"].startswith("ORD")
@@ -69,7 +70,7 @@ class TestOrderLifecycle:
             "password": "password123"
         })
         token = login_resp.json()["access_token"]
-        
+
         headers = {"Authorization": f"Bearer {token}"}
         response = await client.post("/api/orders", json={
             "pickup_address": "123 Main St, Delhi",
@@ -86,7 +87,7 @@ class TestOrderLifecycle:
             "payment_type": "cod",
             "order_value": 3000
         }, headers=headers)
-        
+
         assert response.status_code == 201
         data = response.json()
         assert data["payment_type"] == "cod"

@@ -1,11 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.deps import require_customer
 from app.db.session import get_db
-from app.services.zone_detection import ZoneDetectionService, get_zone_detection_service
-from app.schemas.zone_detection import ZoneDetectionRequest, ZoneDetectionResponse, ZoneByPincodeRequest, ZoneByPincodeResponse
-from app.schemas.zone import ZoneResponse
-from app.api.deps import require_customer, require_agent, require_admin
 from app.models import User
+from app.schemas.zone import ZoneResponse
+from app.schemas.zone_detection import (
+    ZoneByPincodeRequest,
+    ZoneByPincodeResponse,
+    ZoneDetectionRequest,
+    ZoneDetectionResponse,
+)
+from app.services.zone_detection import ZoneDetectionService, get_zone_detection_service
 
 router = APIRouter(prefix="/zones", tags=["zone-detection"])
 
@@ -25,11 +31,11 @@ async def detect_zones(
         drop_city=request.drop_city,
         drop_state=request.drop_state
     )
-    
+
     zone_type = None
     if pickup_zone and drop_zone:
         zone_type = await zone_service.determine_zone_type(pickup_zone.id, drop_zone.id)
-    
+
     return ZoneDetectionResponse(
         pickup_zone=ZoneInfo(id=pickup_zone.id, name=pickup_zone.name, code=pickup_zone.code) if pickup_zone else None,
         drop_zone=ZoneInfo(id=drop_zone.id, name=drop_zone.name, code=drop_zone.code) if drop_zone else None,
@@ -45,7 +51,7 @@ async def detect_zone_by_pincode(
 ):
     """Detect zone by pincode only"""
     zone = await zone_service.detect_zone_by_pincode(request.pincode)
-    
+
     if zone:
         return ZoneByPincodeResponse(
             zone=ZoneInfo(id=zone.id, name=zone.name, code=zone.code),
@@ -62,9 +68,11 @@ async def get_zone(
 ):
     """Get zone details by ID"""
     from uuid import UUID
+
     from sqlalchemy import select
+
     from app.models import Zone
-    
+
     result = await db.execute(select(Zone).where(Zone.id == UUID(zone_id)))
     zone = result.scalar_one_or_none()
     if not zone:

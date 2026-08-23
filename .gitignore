@@ -14,8 +14,10 @@ backend/.env
 out/
 build/
 dist/
-backend/__pycache__/
-backend/*.pyc
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
 backend/.pytest_cache/
 backend/.mypy_cache/
 backend/.ruff_cache/

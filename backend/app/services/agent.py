@@ -200,10 +200,12 @@ class AgentService:
         if not pickup_zone:
             raise ValueError("Pickup zone not found")
         
-        # For MVP, we'll use a default center coordinate for the zone
-        # In production, this would come from zone geometry/center
-        pickup_lat = 28.6139  # Default Delhi coordinates - in production from zone center
-        pickup_lon = 77.2090
+        # Use zone center coordinates
+        if pickup_zone.latitude is None or pickup_zone.longitude is None:
+            raise ValueError("Pickup zone center coordinates not configured")
+        
+        pickup_lat = float(pickup_zone.latitude)
+        pickup_lon = float(pickup_zone.longitude)
         
         # First, try to find agents in the same zone
         result = await self.db.execute(

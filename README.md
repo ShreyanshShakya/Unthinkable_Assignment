@@ -177,7 +177,7 @@ The system calculates charges based on:
 - [Backend README](backend/README.md)
 - [Frontend README](frontend/README.md)
 - [API Documentation](http://localhost:8000/docs) (when running)
-- [System Design](docs/system-design.md) (to be created)
+- [System Design](docs/system-design.md)
 
 ## Testing
 
@@ -188,7 +188,8 @@ cd backend && pytest
 # Frontend tests
 cd frontend && npm test
 
-# E2E tests (to be implemented)
+# E2E tests
+# Run with: pytest tests/test_integration.py -v
 ```
 
 ## License

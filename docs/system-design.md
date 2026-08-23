@@ -43,8 +43,8 @@ A comprehensive last-mile delivery tracking system with real-time order manageme
 
 ### Order Lifecycle
 ```
-CREATED → PICKED_UP → IN_TRANSIT → OUT_FOR_DELIVERY → DELIVERED
-                              ↘ FAILED → (reschedule) → OUT_FOR_DELIVERY
+CREATED → ASSIGNED → PICKED_UP → IN_TRANSIT → OUT_FOR_DELIVERY → DELIVERED
+                              ↘ FAILED → (reschedule) → ASSIGNED → PICKED_UP
 ```
 
 ### Agent Assignment

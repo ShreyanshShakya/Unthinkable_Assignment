@@ -352,6 +352,19 @@ Content-Type: application/json
 
 ---
 
+## Order Statuses
+
+| Status | Description |
+|--------|-------------|
+| created | Order created, awaiting assignment |
+| assigned | Agent assigned, awaiting pickup |
+| picked_up | Package picked up by agent |
+| in_transit | Package in transit to destination |
+| out_for_delivery | Package out for final delivery |
+| delivered | Successfully delivered |
+| failed | Delivery attempt failed |
+| cancelled | Order cancelled |
+
 ## Status Codes
 
 | Code | Description |

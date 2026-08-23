@@ -88,6 +88,8 @@ class Zone(Base):
     name = Column(String(100), unique=True, nullable=False)
     code = Column(String(20), unique=True, nullable=False, index=True)
     description = Column(Text, nullable=True)
+    latitude = Column(Numeric(9, 6), nullable=True)
+    longitude = Column(Numeric(9, 6), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

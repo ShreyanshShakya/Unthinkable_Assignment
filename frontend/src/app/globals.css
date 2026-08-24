@@ -26,6 +26,19 @@ body {
   min-height: 100vh;
 }
 
+/* Keep form values readable even when the OS/browser is using dark mode. */
+input,
+textarea,
+select {
+  color: #111827;
+  background-color: #ffffff;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #9ca3af;
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;
@@ -46,7 +59,7 @@ body {
     @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
   }
   .input {
-    @apply w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500;
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500;
   }
   .label {
     @apply block text-sm font-medium text-gray-700 mb-1;

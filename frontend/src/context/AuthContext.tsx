@@ -39,16 +39,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const response = await api.post('/auth/login', { email, password });
-    const { access_token, refresh_token } = response.data;
-    // Get user info
-    const userResponse = await api.get('/auth/me');
-    setAuth(userResponse.data, access_token, refresh_token);
-    // Also store in localStorage for axios interceptor
-    localStorage.setItem('access_token', access_token);
-    localStorage.setItem('refresh_token', refresh_token);
-    router.push('/dashboard');
-  };
+  const response = await api.post('/auth/login', { email, password });
+  const { access_token, refresh_token } = response.data;
+
+  // Store tokens BEFORE calling authenticated endpoints
+  localStorage.setItem('access_token', access_token);
+  localStorage.setItem('refresh_token', refresh_token);
+
+  // Now the Axios interceptor will attach the Bearer token
+  const userResponse = await api.get('/auth/me');
+
+  setAuth(userResponse.data, access_token, refresh_token);
+  router.push('/dashboard');
+};
 
   const register = async (data: RegisterData) => {
     const response = await api.post('/auth/register', data);

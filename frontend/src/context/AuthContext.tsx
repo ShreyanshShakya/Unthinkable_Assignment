@@ -22,16 +22,25 @@ interface RegisterData {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const getRoleHome = (role: string) => {
+  switch (role) {
+    case 'admin':
+      return '/admin';
+    case 'agent':
+      return '/agent';
+    default:
+      return '/dashboard';
+  }
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
-  const { setAuth, clearAuth, isAuthenticated } = useAuthStore();
+  const { setAuth, clearAuth } = useAuthStore();
   const router = useRouter();
 
   useEffect(() => {
-    // Check if we have a valid token on mount
     const token = localStorage.getItem('access_token');
     if (token) {
-      // Token exists, consider authenticated
       setIsLoading(false);
     } else {
       setIsLoading(false);
@@ -39,38 +48,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-  const response = await api.post('/auth/login', { email, password });
-  const { access_token, refresh_token } = response.data;
+    const response = await api.post('/auth/login', { email, password });
+    const { access_token, refresh_token } = response.data;
 
-  // Store tokens BEFORE calling authenticated endpoints
-  localStorage.setItem('access_token', access_token);
-  localStorage.setItem('refresh_token', refresh_token);
+    localStorage.setItem('access_token', access_token);
+    localStorage.setItem('refresh_token', refresh_token);
 
-  // Now the Axios interceptor will attach the Bearer token
-  const userResponse = await api.get('/auth/me');
+    const userResponse = await api.get('/auth/me');
+    const user = userResponse.data;
 
-  setAuth(userResponse.data, access_token, refresh_token);
-  router.push('/dashboard');
-};
+    setAuth(user, access_token, refresh_token);
+    router.push(getRoleHome(user.role));
+  };
 
   const register = async (data: RegisterData) => {
     const response = await api.post('/auth/register', data);
-    // Auto-login after registration
-    const loginResponse = await api.post('/auth/login', { 
-      email: data.email, 
-      password: data.password 
+
+    const loginResponse = await api.post('/auth/login', {
+      email: data.email,
+      password: data.password,
     });
     const { access_token, refresh_token } = loginResponse.data;
-    setAuth(response.data, access_token, refresh_token);
-    // Also store in localStorage for axios interceptor
+
     localStorage.setItem('access_token', access_token);
     localStorage.setItem('refresh_token', refresh_token);
-    router.push('/dashboard');
+
+    // Use /auth/me so the redirect is based on the role actually stored by the backend.
+    const userResponse = await api.get('/auth/me');
+    const user = userResponse.data;
+
+    setAuth(user, access_token, refresh_token);
+    router.push(getRoleHome(user.role));
   };
 
   const logout = () => {
     clearAuth();
-    // Also clear localStorage for axios interceptor
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     router.push('/login');

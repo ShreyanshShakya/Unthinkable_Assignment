@@ -10,10 +10,10 @@
 │ email       │       │ name        │       │ zone_id (FK)│
 │ password    │       │ code        │       │ name        │
 │ full_name   │       │ description │       │ pincode     │
-│ phone       │       │ is_active   │       │ city        │
-│ role        │◄──────│             │       │ state       │
-│ is_active   │       └──────┬──────┘       │ is_active   │
-└──────┬──────┘              │            └─────────────┘
+│ phone       │       │ latitude    │       │ city        │
+│ role        │       │ longitude   │       │ state       │
+│ is_active   │       │ is_active   │       │ is_active   │
+└──────┬──────┘       └──────┬──────┘       └─────────────┘
        │                     │
        │              ┌──────▼──────┐
        │              │  RateCard   │
@@ -37,8 +37,8 @@
 │ pickup_addr │      │ min_weight  │      │ surcharge_pct  │
 │ drop_addr   │      │ max_weight  │      │ min_surcharge  │
 │ pickup_pin  │      │ base_charge │      │ max_surcharge  │
-│ drop_pin    │      │ per_kg_chg  │      │ is_active      │
-│ dimensions  │      └─────────────┘      └────────────────┘
+│ drop_pin    │      └─────────────┘      │ is_active      │
+│ dimensions  │                           └────────────────┘
 │ weights     │
 │ order_type  │      ┌─────────────────┐
 │ pay_type    │      │OrderStatusHist  │
@@ -50,20 +50,20 @@
        │             │ actor_id (FK)   │
        │             │ actor_role      │
        │             │ reason          │
-       │             │ created_at      │
-       │             └─────────────────┘
-       │
-┌──────▼──────┐ ┌──────────────┐ ┌────────────────┐
-│   Agent     │ │AgentLocation │DeliveryAttempt │
-├─────────────┤ ├──────────────┤ ├────────────────┤
-│ id (PK)     │ │ id (PK)      │ │ id (PK)        │
-│ user_id(FK) │ │ agent_id(FK) │ │ order_id (FK)  │
-│ employee_id │ │ latitude     │ │ agent_id (FK)  │
-│ zone_id(FK) │ │ longitude    │ │ attempt_num    │
-│ status      │ │ accuracy     │ │ status         │
-│ max_deliv   │ │ zone_id(FK)  │ │ failure_reason │
-│ curr_deliv  │ └──────────────┘ │ lat/long       │
-└─────────────┘                  │ proof_of_deliv │
+┌──────▼──────┐      │ created_at      │
+│   Agent     │      └─────────────────┘
+├─────────────┤
+│ id (PK)     │ ┌──────────────┐ ┌────────────────┐
+│ user_id(FK) │ │AgentLocation │ │DeliveryAttempt │
+│ employee_id │ ├──────────────┤ ├────────────────┤
+│ zone_id(FK) │ │ id (PK)      │ │ id (PK)        │
+│ status      │ │ agent_id(FK) │ │ order_id (FK)  │
+│ max_deliv   │ │ latitude     │ │ agent_id (FK)  │
+│ curr_deliv  │ │ longitude    │ │ attempt_num    │
+└─────────────┘ │ accuracy     │ │ status         │
+                │ zone_id(FK)  │ │ failure_reason │
+                └──────────────┘ │ lat/long       │
+                                 │ proof_of_deliv │
                                  │ timestamps     │
                                  └────────────────┘
 ```
@@ -92,9 +92,13 @@
 | name | VARCHAR(100) | UNIQUE, NOT NULL |
 | code | VARCHAR(20) | UNIQUE, NOT NULL |
 | description | TEXT | |
+| latitude | NUMERIC(9,6) | NULL; zone center latitude |
+| longitude | NUMERIC(9,6) | NULL; zone center longitude |
 | is_active | BOOLEAN | DEFAULT true |
 | created_at | TIMESTAMP | DEFAULT now() |
 | updated_at | TIMESTAMP | DEFAULT now() |
+
+Zone coordinates are an optional single center point used by the MVP assignment algorithm for distance ranking against the agent's latest GPS location.
 
 ### zone_areas
 | Column | Type | Constraints |
@@ -142,12 +146,7 @@
 | created_at | TIMESTAMP | DEFAULT now() |
 | updated_at | TIMESTAMP | DEFAULT now() |
 
-**Constraints**: 
-- min_weight_kg ≥ 0
-- max_weight_kg IS NULL OR max_weight_kg > min_weight_kg
-- base_charge ≥ 0
-- per_kg_charge ≥ 0
-
+**Constraints**: min_weight_kg ≥ 0; max_weight_kg IS NULL OR max_weight_kg > min_weight_kg; base_charge ≥ 0; per_kg_charge ≥ 0.
 **Indexes**: (rate_card_id, pickup_zone_id, drop_zone_id, min_weight_kg)
 
 ### cod_surcharges
@@ -164,12 +163,7 @@
 | created_at | TIMESTAMP | DEFAULT now() |
 | updated_at | TIMESTAMP | DEFAULT now() |
 
-**Constraints**: 
-- surcharge_percentage 0-100
-- min_surcharge ≥ 0
-- max_surcharge ≥ min_surcharge
-- max_order_value > min_order_value
-
+**Constraints**: surcharge_percentage 0-100; min_surcharge ≥ 0; max_surcharge ≥ min_surcharge; max_order_value > min_order_value.
 **Indexes**: (rate_card_id, min_order_value, is_active)
 
 ### orders
@@ -208,15 +202,8 @@
 | picked_up_at | TIMESTAMP | |
 | delivered_at | TIMESTAMP | |
 
-**Constraints**: 
-- actual_weight_kg > 0
-- billable_weight_kg ≥ actual_weight_kg
-- total_charge ≥ 0
-
-**Indexes**: 
-- (customer_id, status)
-- (agent_id, status)
-- (created_at, status)
+**Constraints**: actual_weight_kg > 0; billable_weight_kg ≥ actual_weight_kg; total_charge ≥ 0.
+**Indexes**: (customer_id, status), (agent_id, status), (created_at, status)
 
 ### order_status_history
 | Column | Type | Constraints |
@@ -343,6 +330,7 @@
 
 ### orderstatus
 - created
+- assigned
 - picked_up
 - in_transit
 - out_for_delivery
@@ -364,6 +352,12 @@
 - in_progress
 - delivered
 - failed
+
+## Assignment Notes
+
+- An order enters `assigned` when an agent is selected; assignment does not imply pickup.
+- Auto-assignment considers agent activity/availability and capacity, then prefers pickup-zone affinity, shorter Haversine distance from the zone center, and lower current load.
+- Zone latitude/longitude are optional MVP center coordinates. Agent GPS is stored separately in `agent_locations`.
 
 ## Naming Conventions
 - Tables: snake_case, plural

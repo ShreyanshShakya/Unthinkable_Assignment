@@ -34,6 +34,7 @@ export default function RegisterPage() {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
@@ -154,11 +155,11 @@ export default function RegisterPage() {
               Register as
             </label>
             <div className="grid grid-cols-3 gap-2">
-              {['customer', 'agent', 'admin'].map((role) => (
+              {(['customer', 'agent', 'admin'] as const).map((role) => (
                 <button
                   key={role}
                   type="button"
-                  onClick={() => register('role', role)}
+                  onClick={() => setValue('role', role)}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     watch('role') === role
                       ? 'bg-primary-600 text-white'

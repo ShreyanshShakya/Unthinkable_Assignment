@@ -4,6 +4,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
+from tests.conftest import unique_email
 
 
 @pytest.fixture
@@ -20,17 +21,18 @@ class TestOrderLifecycle:
     async def test_create_order_customer(self, client):
         """Test customer can create an order"""
         # First register and login a customer
+        email = unique_email("cust")
         register_resp = await client.post("/api/auth/register", json={
-            "email": "customer_test@example.com",
+            "email": email,
             "full_name": "Test Customer",
-            "password": "password123",
+            "password": "pwd12345",
             "role": "customer"
         })
         assert register_resp.status_code == 201
 
         login_resp = await client.post("/api/auth/login", json={
-            "email": "customer_test@example.com",
-            "password": "password123"
+            "email": email,
+            "password": "pwd123"
         })
         assert login_resp.status_code == 200
         token = login_resp.json()["access_token"]
@@ -64,10 +66,17 @@ class TestOrderLifecycle:
     @pytest.mark.asyncio
     async def test_create_order_cod(self, client):
         """Test creating COD order"""
-        # Login as customer
+        # Register and login a customer
+        email = unique_email("codcust")
+        await client.post("/api/auth/register", json={
+            "email": email,
+            "full_name": "COD Customer",
+            "password": "pwd12345",
+            "role": "customer"
+        })
         login_resp = await client.post("/api/auth/login", json={
-            "email": "customer_test@example.com",
-            "password": "password123"
+            "email": email,
+            "password": "pwd123"
         })
         token = login_resp.json()["access_token"]
 
@@ -102,15 +111,16 @@ class TestOrderStatusTransitions:
     async def auth_client(self, client):
         """Create authenticated client with order"""
         # Register and login
+        email = unique_email("orderuser")
         await client.post("/api/auth/register", json={
-            "email": f"test_{uuid4().hex[:8]}@example.com",
+            "email": email,
             "full_name": "Test User",
-            "password": "password123",
+            "password": "pwd12345",
             "role": "customer"
         })
         login = await client.post("/api/auth/login", json={
-            "email": f"test_{uuid4().hex[:8]}@example.com",
-            "password": "password123"
+            "email": email,
+            "password": "pwd123"
         })
         token = login.json()["access_token"]
         return {"client": client, "token": token, "headers": {"Authorization": f"Bearer {token}"}}

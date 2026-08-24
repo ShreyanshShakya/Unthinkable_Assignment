@@ -317,8 +317,8 @@ export default function AdminDashboard() {
                               View
                             </Link>
                           </td>
-                        </tr>
-                      ))}
+</tr>
+                      )))}
                   </tbody>
                 </table>
               </div>

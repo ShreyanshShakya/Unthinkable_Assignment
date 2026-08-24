@@ -1,10 +1,16 @@
 import os
+import uuid
 
 os.environ["DATABASE_URL"] = "postgresql+asyncpg://postgres:postgres@localhost:5432/test_lastmile"
 os.environ["ENVIRONMENT"] = "test"
 os.environ["SECRET_KEY"] = "test-secret-key-for-testing-only-min-32-chars-long"
 
 import asyncio
+
+
+def unique_email(prefix: str = "user") -> str:
+    """Generate a unique email for test isolation."""
+    return f"{prefix}_{uuid.uuid4().hex[:8]}@example.com"
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -28,7 +34,13 @@ def event_loop():
 def postgres_container():
     """Start a PostgreSQL container for testing"""
     with PostgresContainer("postgres:15") as postgres:
-        yield postgres.get_connection_url()
+        url = postgres.get_connection_url()
+        # Replace psycopg2 driver with asyncpg for async engine
+        if url.startswith("postgresql+psycopg2://"):
+            url = url.replace("postgresql+psycopg2://", "postgresql+asyncpg://", 1)
+        elif url.startswith("postgresql://"):
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        yield url
 
 
 @pytest.fixture(scope="session")
@@ -82,7 +94,7 @@ async def test_db(test_engine):
 @pytest.fixture
 async def client(test_engine):
     test_session_local = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
-
+    
     async def override_get_db():
         async with test_session_local() as session:
             try:
@@ -93,9 +105,32 @@ async def client(test_engine):
                 raise
             finally:
                 await session.close()
-
+    
     app.dependency_overrides[get_db] = override_get_db
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+async def auth_client(test_engine):
+    """Authenticated client with a registered customer (short password)."""
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        # Register a user with short password (<=72 bytes, min 8 chars)
+        email = unique_email("customer")
+        await ac.post("/api/auth/register", json={
+            "email": email,
+            "full_name": "Test Customer",
+            "password": "pwd12345",
+            "role": "customer"
+        })
+        # Login to obtain tokens
+        login_resp = await ac.post("/api/auth/login", json={
+            "email": email,
+            "password": "pwd12345"
+        })
+        assert login_resp.status_code == 200
+        tokens = login_resp.json()
+        ac.headers.update({"Authorization": f"Bearer {tokens['access_token']}"})
+        yield ac

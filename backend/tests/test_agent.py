@@ -3,6 +3,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
+from tests.conftest import unique_email
 
 
 @pytest.fixture
@@ -117,32 +118,30 @@ class TestAssignmentAlgorithm:
             service = AgentService(session)
 
             # Create two zones
-            zone_a = Zone(id=uuid4(), name="Zone A", code="ZA", is_active=True)
-            zone_b = Zone(id=uuid4(), name="Zone B", code="ZB", is_active=True)
-            zone_a.latitude = 28.6139
-            zone_a.longitude = 77.2090
-            zone_b.latitude = 19.0760
-            zone_b.longitude = 72.8777
+            zone_a = Zone(id=uuid4(), name="Zone A", code="ZA", is_active=True,
+                          latitude=28.6139, longitude=77.2090)
+            zone_b = Zone(id=uuid4(), name="Zone B", code="ZB", is_active=True,
+                          latitude=19.0760, longitude=72.8777)
             session.add_all([zone_a, zone_b])
-            await session.commit()
+            await session.flush()
 
             # Create users
-            user_a = User(id=uuid4(), email="agent_a@example.com", full_name="Agent A",
+            user_a = User(id=uuid4(), email=unique_email("agent_a"), full_name="Agent A",
                           hashed_password="hash", role="agent", is_active=True)
-            user_b = User(id=uuid4(), email="agent_b@example.com", full_name="Agent B",
+            user_b = User(id=uuid4(), email=unique_email("agent_b"), full_name="Agent B",
                           hashed_password="hash", role="agent", is_active=True)
             session.add_all([user_a, user_b])
-            await session.commit()
+            await session.flush()
 
             # Create agents
-            agent_a = Agent(id=uuid4(), user_id=user_a.id, employee_id="AGT001",
+            agent_a = Agent(id=uuid4(), user_id=user_a.id, employee_id=f"AGT{uuid4().hex[:6]}",
                            zone_id=zone_a.id, status=AgentStatus.AVAILABLE,
                            max_concurrent_deliveries=3, current_deliveries_count=0, is_active=True)
-            agent_b = Agent(id=uuid4(), user_id=user_b.id, employee_id="AGT002",
+            agent_b = Agent(id=uuid4(), user_id=user_b.id, employee_id=f"AGT{uuid4().hex[:6]}",
                            zone_id=zone_b.id, status=AgentStatus.AVAILABLE,
                            max_concurrent_deliveries=3, current_deliveries_count=0, is_active=True)
             session.add_all([agent_a, agent_b])
-            await session.commit()
+            await session.flush()
 
             # Add locations (agent_a in zone_a, agent_b in zone_b)
             loc_a = AgentLocation(id=uuid4(), agent_id=agent_a.id,
@@ -150,7 +149,13 @@ class TestAssignmentAlgorithm:
             loc_b = AgentLocation(id=uuid4(), agent_id=agent_b.id,
                                  latitude=19.0760, longitude=72.8777, zone_id=zone_b.id)
             session.add_all([loc_a, loc_b])
-            await session.commit()
+            await session.flush()
+
+            # Create a customer user for the order
+            customer_user = User(id=uuid4(), email=unique_email("cust"), full_name="Test Customer",
+                                 hashed_password="hash", role="customer", is_active=True)
+            session.add(customer_user)
+            await session.flush()
 
             # Create order in zone_a
             order_id = uuid4()
@@ -158,7 +163,7 @@ class TestAssignmentAlgorithm:
             order = Order(
                 id=order_id,
                 order_number="ORDTEST001",
-                customer_id=uuid4(),
+                customer_id=customer_user.id,
                 pickup_address="Test Pickup",
                 pickup_pincode="110001",
                 drop_address="Test Drop",
@@ -176,7 +181,7 @@ class TestAssignmentAlgorithm:
                 status=OrderStatus.CREATED
             )
             session.add(order)
-            await session.commit()
+            await session.flush()
 
             # Test assignment - should pick agent_a (same zone, closer)
             assignment = await service.auto_assign_order(order_id)
@@ -201,25 +206,25 @@ class TestAssignmentAlgorithm:
             zone = Zone(id=uuid4(), name="Test Zone", code="TZ", is_active=True,
                        latitude=28.6139, longitude=77.2090)
             session.add(zone)
-            await session.commit()
+            await session.flush()
 
             # Create users
-            user1 = User(id=uuid4(), email="agent1@example.com", full_name="Agent One",
+            user1 = User(id=uuid4(), email=unique_email("agent1"), full_name="Agent One",
                          hashed_password="hash", role="agent", is_active=True)
-            user2 = User(id=uuid4(), email="agent2@example.com", full_name="Agent Two",
+            user2 = User(id=uuid4(), email=unique_email("agent2"), full_name="Agent Two",
                          hashed_password="hash", role="agent", is_active=True)
             session.add_all([user1, user2])
-            await session.commit()
+            await session.flush()
 
             # Create agents (both in same zone)
-            agent1 = Agent(id=uuid4(), user_id=user1.id, employee_id="AGT001",
+            agent1 = Agent(id=uuid4(), user_id=user1.id, employee_id=f"AGT{uuid4().hex[:6]}",
                           zone_id=zone.id, status=AgentStatus.AVAILABLE,
                           max_concurrent_deliveries=3, current_deliveries_count=0, is_active=True)
-            agent2 = Agent(id=uuid4(), user_id=user2.id, employee_id="AGT002",
+            agent2 = Agent(id=uuid4(), user_id=user2.id, employee_id=f"AGT{uuid4().hex[:6]}",
                           zone_id=zone.id, status=AgentStatus.AVAILABLE,
                           max_concurrent_deliveries=3, current_deliveries_count=0, is_active=True)
             session.add_all([agent1, agent2])
-            await session.commit()
+            await session.flush()
 
             # Agent1 at zone center (closer)
             loc1 = AgentLocation(id=uuid4(), agent_id=agent1.id,
@@ -228,7 +233,13 @@ class TestAssignmentAlgorithm:
             loc2 = AgentLocation(id=uuid4(), agent_id=agent2.id,
                                 latitude=28.6500, longitude=77.2200, zone_id=zone.id)
             session.add_all([loc1, loc2])
-            await session.commit()
+            await session.flush()
+
+            # Create a customer user for the order
+            customer_user = User(id=uuid4(), email=unique_email("cust"), full_name="Test Customer",
+                                 hashed_password="hash", role="customer", is_active=True)
+            session.add(customer_user)
+            await session.flush()
 
             # Create order in same zone
             order_id = uuid4()
@@ -236,7 +247,7 @@ class TestAssignmentAlgorithm:
             order = Order(
                 id=order_id,
                 order_number="ORDTEST002",
-                customer_id=uuid4(),
+                customer_id=customer_user.id,
                 pickup_address="Test Pickup",
                 pickup_pincode="110001",
                 drop_address="Test Drop",
@@ -254,7 +265,7 @@ class TestAssignmentAlgorithm:
                 status=OrderStatus.CREATED
             )
             session.add(order)
-            await session.commit()
+            await session.flush()
 
             # Test assignment - should pick agent1 (closer to zone center)
             assignment = await service.auto_assign_order(order_id)

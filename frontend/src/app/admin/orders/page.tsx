@@ -264,7 +264,7 @@ export default function AdminOrdersPage() {
                             </Link>
                           </td>
                         </tr>
-                      ))}
+)))}
                   </tbody>
                 </table>
               </div>

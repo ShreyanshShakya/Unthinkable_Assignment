@@ -1,11 +1,14 @@
 # API Documentation
 
 Base URL: `http://localhost:8000/api`
+
 Swagger UI: `http://localhost:8000/docs`
 
-## Authentication
+All protected endpoints require `Authorization: Bearer <access_token>`.
 
-All protected endpoints require `Authorization: Bearer <access_token>` header.
+> **Source of truth:** FastAPI's generated OpenAPI schema at `/openapi.json` and Swagger UI at `/docs`. This Markdown document provides the evaluator-friendly API overview and representative request examples.
+
+## Authentication
 
 ### Register
 ```http
@@ -31,7 +34,7 @@ Content-Type: application/json
 }
 ```
 
-**Response**:
+**Response:**
 ```json
 {
   "access_token": "eyJ...",
@@ -60,7 +63,7 @@ Authorization: Bearer <token>
 
 ## Pricing
 
-### Calculate Price (with zone IDs)
+### Calculate Price
 ```http
 POST /pricing/calculate
 Authorization: Bearer <token>
@@ -79,7 +82,8 @@ Content-Type: application/json
 }
 ```
 
-### Get Quote (with pincodes)
+### Get Quote
+
 ```http
 POST /pricing/quote
 Authorization: Bearer <token>
@@ -102,12 +106,14 @@ Content-Type: application/json
 
 ## Zone Detection
 
-### Detect Zones
-```http
-POST /zones/detect
-Authorization: Bearer <token>
-Content-Type: application/json
+| Method | Endpoint | Purpose |
+|---|---|---|
+| POST | `/zones/detect` | Detect pickup/drop zones from pincodes |
+| POST | `/zones/detect-by-pincode` | Detect a single zone |
 
+Example:
+
+```json
 {
   "pickup_pincode": "110001",
   "pickup_city": "Delhi",
@@ -116,22 +122,24 @@ Content-Type: application/json
 }
 ```
 
-### Detect Single Zone by Pincode
-```http
-POST /zones/detect-by-pincode
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "pincode": "110001"
-}
-```
-
 ---
 
 ## Customer Orders
 
+| Method | Endpoint | Purpose |
+|---|---|---|
+| POST | `/orders` | Create order and calculate server-side pricing |
+| POST | `/orders/quote` | Get quote before creating an order |
+| GET | `/orders` | List customer's orders |
+| GET | `/orders/{order_id}` | Get order details |
+| GET | `/orders/number/{order_number}` | Get order by number |
+| PATCH | `/orders/{order_id}/status` | Update an allowed status transition |
+| GET | `/orders/{order_id}/tracking` | Get immutable tracking history |
+| PATCH | `/orders/{order_id}` | Update permitted fields before pickup |
+| DELETE | `/orders/{order_id}` | Cancel an eligible order |
+
 ### Create Order
+
 ```http
 POST /orders
 Authorization: Bearer <token>
@@ -154,32 +162,8 @@ Content-Type: application/json
 }
 ```
 
-### Get Quote Before Order
-```http
-POST /orders/quote
-Authorization: Bearer <token>
-Content-Type: application/json
-```
+### Status update
 
-### List Orders
-```http
-GET /orders?status=created&skip=0&limit=20
-Authorization: Bearer <token>
-```
-
-### Get Order Details
-```http
-GET /orders/{order_id}
-Authorization: Bearer <token>
-```
-
-### Get Order by Number
-```http
-GET /orders/number/{order_number}
-Authorization: Bearer <token>
-```
-
-### Update Order Status (Customer/Agent)
 ```http
 PATCH /orders/{order_id}/status
 Authorization: Bearer <token>
@@ -191,29 +175,7 @@ Content-Type: application/json
 }
 ```
 
-### Get Tracking History
-```http
-GET /orders/{order_id}/tracking
-Authorization: Bearer <token>
-```
-
-### Update Order (before pickup)
-```http
-PATCH /orders/{order_id}
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "drop_address": "Updated address",
-  "order_value": 3500
-}
-```
-
-### Cancel Order
-```http
-DELETE /orders/{order_id}
-Authorization: Bearer <token>
-```
+The backend validates status transitions and role permissions. `ASSIGNED` is created by assignment; `PICKED_UP` is an explicit pickup event.
 
 ---
 
@@ -222,11 +184,11 @@ Authorization: Bearer <token>
 ### Zones
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+|---|---|---|
 | POST | `/admin/zones` | Create zone |
 | GET | `/admin/zones` | List zones |
 | GET | `/admin/zones/{id}` | Get zone |
-| PUT | `/admin/zones/{id}` | Update zone |
+| PUT | `/admin/zones/{id}` | Update zone, including optional center coordinates |
 | DELETE | `/admin/zones/{id}` | Soft delete zone |
 | POST | `/admin/zones/{id}/areas` | Add area to zone |
 | GET | `/admin/zones/{id}/areas` | List zone areas |
@@ -236,7 +198,7 @@ Authorization: Bearer <token>
 ### Rate Cards
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+|---|---|---|
 | POST | `/admin/rate-cards` | Create rate card |
 | GET | `/admin/rate-cards` | List rate cards |
 | GET | `/admin/rate-cards/{id}` | Get rate card |
@@ -251,20 +213,22 @@ Authorization: Bearer <token>
 | PUT | `/admin/cod-surcharges/{id}` | Update COD surcharge |
 | DELETE | `/admin/cod-surcharges/{id}` | Delete COD surcharge |
 
-### Orders (Admin)
+### Orders / Assignment
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+|---|---|---|
 | GET | `/admin/orders` | List all orders |
 | GET | `/admin/orders/{id}` | Get order details |
-| PATCH | `/admin/orders/{id}/status` | Update status (any transition) |
-| POST | `/admin/orders/{id}/override` | Override status (bypass validation) |
-| POST | `/admin/assign` | Assign/reassign agent |
+| PATCH | `/admin/orders/{id}/status` | Update status through admin rules |
+| POST | `/admin/orders/{id}/override` | Override status when authorized |
+| POST | `/admin/assign` | Manual or automatic agent assignment/reassignment |
 
-### Agents (Admin)
+Auto-assignment ranks eligible agents by pickup-zone affinity, Haversine distance from the pickup-zone center, then current load.
+
+### Agents
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+|---|---|---|
 | GET | `/admin/agents` | List agents |
 | GET | `/admin/agents/{id}` | Get agent |
 | PATCH | `/admin/agents/{id}/deactivate` | Deactivate agent |
@@ -273,36 +237,25 @@ Authorization: Bearer <token>
 
 ## Agent Endpoints
 
-### Profile
-
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+|---|---|---|
 | POST | `/agents/profile` | Create agent profile |
-| GET | `/agents/profile` | Get my profile |
+| GET | `/agents/profile` | Get current agent profile |
 | PATCH | `/agents/profile` | Update profile |
 | PATCH | `/agents/availability` | Update availability |
-
-### Location
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
 | POST | `/agents/location` | Update GPS location |
-
-### Dashboard & Orders
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
 | GET | `/agent` | Agent dashboard |
-| GET | `/agent/orders` | My assigned orders |
-| GET | `/agent/orders/{id}` | Order details |
-| PATCH | `/agent/orders/{id}/status` | Update status |
+| GET | `/agent/orders` | Assigned orders |
+| GET | `/agent/orders/{id}` | Assigned order details |
+| PATCH | `/agent/orders/{id}/status` | Update delivery status |
 | POST | `/agent/orders/{id}/complete` | Complete delivery |
 
 ---
 
-## Failed Deliveries
+## Failed Deliveries & Rescheduling
 
-### Mark Failed (Agent)
+### Mark Failed
+
 ```http
 POST /failed-deliveries/{order_id}/mark-failed
 Authorization: Bearer <token>
@@ -315,20 +268,22 @@ Content-Type: application/json
 }
 ```
 
-### Request Reschedule (Customer)
+### Request Reschedule
+
 ```http
 POST /failed-deliveries/{order_id}/reschedule
 Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "preferred_date": "2024-01-15T10:00:00Z",
+  "preferred_date": "2026-08-25T10:00:00Z",
   "preferred_time_slot": "morning",
   "reason": "Was not home"
 }
 ```
 
-### Admin: Approve Reschedule
+### Approve / Reject Reschedule
+
 ```http
 PATCH /failed-deliveries/reschedule-requests/{id}/approve
 Authorization: Bearer <token>
@@ -339,7 +294,6 @@ Content-Type: application/json
 }
 ```
 
-### Admin: Reject Reschedule
 ```http
 PATCH /failed-deliveries/reschedule-requests/{id}/reject
 Authorization: Bearer <token>
@@ -354,21 +308,21 @@ Content-Type: application/json
 
 ## Order Statuses
 
-| Status | Description |
-|--------|-------------|
-| created | Order created, awaiting assignment |
-| assigned | Agent assigned, awaiting pickup |
-| picked_up | Package picked up by agent |
-| in_transit | Package in transit to destination |
-| out_for_delivery | Package out for final delivery |
-| delivered | Successfully delivered |
-| failed | Delivery attempt failed |
-| cancelled | Order cancelled |
+| Status | Meaning |
+|---|---|
+| `created` | Order created, awaiting assignment |
+| `assigned` | Agent selected, awaiting pickup |
+| `picked_up` | Agent physically picked up the package |
+| `in_transit` | Package moving toward destination |
+| `out_for_delivery` | Final delivery attempt is in progress |
+| `delivered` | Successfully delivered |
+| `failed` | Current delivery attempt failed |
+| `cancelled` | Order cancelled |
 
 ## Status Codes
 
-| Code | Description |
-|------|-------------|
+| Code | Meaning |
+|---|---|
 | 200 | Success |
 | 201 | Created |
 | 400 | Bad Request |
@@ -379,17 +333,19 @@ Content-Type: application/json
 | 500 | Server Error |
 
 ## Error Format
+
 ```json
 {
   "detail": "Error description"
 }
 ```
 
-## Pagination
-- `skip`: Number of records to skip
-- `limit`: Max records per page (max 100)
+## Pagination and Filtering
 
-## Filtering
-- `status`: Filter by order status
-- `order_type`: Filter by order type (b2b/b2c)
-- `payment_type`: Filter by payment type (prepaid/cod)
+Common list endpoints support:
+
+- `skip`: number of records to skip
+- `limit`: maximum records per page (max 100)
+- `status`: filter by order status
+- `order_type`: `b2b` or `b2c`
+- `payment_type`: `prepaid` or `cod`

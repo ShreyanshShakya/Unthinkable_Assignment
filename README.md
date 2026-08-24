@@ -6,14 +6,14 @@ A complete last-mile delivery tracking system with real-time order management, a
 
 ```
 ┌─────────────┐     REST API      ┌─────────────┐
-│  Frontend   │ ◄─────────────────► │  Backend    │
+│  Frontend   │ ◄────────────────► │  Backend    │
 │  (Next.js)  │                     │  (FastAPI)  │
 └─────────────┘                     └──────┬──────┘
-                                            │
-                                    ┌───────▼───────┐
-                                    │  PostgreSQL   │
-                                    │  (Neon/Local) │
-                                    └───────────────┘
+                                           │
+                                   ┌───────▼───────┐
+                                   │  PostgreSQL   │
+                                   │  (Neon/Local) │
+                                   └───────────────┘
 ```
 
 ## Tech Stack
@@ -27,6 +27,7 @@ A complete last-mile delivery tracking system with real-time order management, a
 - **Resend** - Transactional emails
 - **Twilio** - SMS notifications
 - **Pytest** - Testing
+- **Testcontainers** - PostgreSQL integration-test environment
 
 ### Frontend
 - **Next.js 14** - React framework (App Router)
@@ -60,6 +61,7 @@ last-mile-delivery-tracker/
 │   │   └── types/          # TypeScript types
 │   └── package.json
 ├── docker-compose.yml      # Full stack
+├── docs/                   # System, schema and API documentation
 └── README.md
 ```
 
@@ -100,7 +102,7 @@ docker-compose exec backend alembic upgrade head
 ```bash
 cd backend
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
 pip install -e ".[dev]"
 cp .env.example .env
 # Edit .env
@@ -148,6 +150,23 @@ The system calculates charges based on:
 4. **COD Surcharge** = percentage of order value (configurable)
 5. **Total** = Base Charge + COD Surcharge
 
+## Order Lifecycle
+
+```text
+CREATED → ASSIGNED → PICKED_UP → IN_TRANSIT → OUT_FOR_DELIVERY → DELIVERED
+                                  ↘ FAILED → reschedule → ASSIGNED → PICKED_UP
+```
+
+`ASSIGNED` means the agent has been selected; the agent must explicitly perform pickup before the order becomes `PICKED_UP`.
+
+### Auto Assignment
+Eligible agents are ranked by:
+1. Pickup-zone affinity
+2. Haversine distance from the pickup-zone center
+3. Current delivery load
+
+Agents must be active, available, and below their configured concurrent-delivery capacity.
+
 ## Deployment
 
 ### Backend → Render/Railway
@@ -178,8 +197,12 @@ The system calculates charges based on:
 - [Frontend README](frontend/README.md)
 - [API Documentation](http://localhost:8000/docs) (when running)
 - [System Design](docs/system-design.md)
+- [Database Schema](docs/database-schema.md)
+- [API Reference](docs/api-docs.md)
 
 ## Testing
+
+Backend integration tests use **PostgreSQL through Testcontainers**, matching the production database engine. Docker Desktop must be running when executing these tests locally.
 
 ```bash
 # Backend tests
@@ -188,8 +211,8 @@ cd backend && pytest
 # Frontend tests
 cd frontend && npm test
 
-# E2E tests
-# Run with: pytest tests/test_integration.py -v
+# Integration tests
+cd backend && pytest tests/test_integration.py -v
 ```
 
 ## License

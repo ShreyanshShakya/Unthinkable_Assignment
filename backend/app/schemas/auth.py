@@ -35,11 +35,15 @@ class TokenPayload(BaseModel):
     type: str
 
 
+from datetime import datetime
+from uuid import UUID
+
+
 class UserResponse(UserBase):
-    id: str
+    id: UUID
     role: UserRole
     is_active: bool
-    created_at: str
+    created_at: datetime
 
     class Config:
         from_attributes = True

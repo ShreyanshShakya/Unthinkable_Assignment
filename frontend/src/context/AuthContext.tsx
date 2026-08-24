@@ -44,6 +44,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Get user info
     const userResponse = await api.get('/auth/me');
     setAuth(userResponse.data, access_token, refresh_token);
+    // Also store in localStorage for axios interceptor
+    localStorage.setItem('access_token', access_token);
+    localStorage.setItem('refresh_token', refresh_token);
     router.push('/dashboard');
   };
 
@@ -56,11 +59,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     const { access_token, refresh_token } = loginResponse.data;
     setAuth(response.data, access_token, refresh_token);
+    // Also store in localStorage for axios interceptor
+    localStorage.setItem('access_token', access_token);
+    localStorage.setItem('refresh_token', refresh_token);
     router.push('/dashboard');
   };
 
   const logout = () => {
     clearAuth();
+    // Also clear localStorage for axios interceptor
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
     router.push('/login');
   };
 

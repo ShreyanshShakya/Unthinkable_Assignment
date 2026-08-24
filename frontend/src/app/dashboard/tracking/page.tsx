@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
 import { Layout } from '@/components/Layout';
 import { MapPin, Package, Truck, CheckCircle, Clock, ArrowLeft, ExternalLink, AlertCircle } from 'lucide-react';
 import api from '@/lib/api';
@@ -42,10 +41,8 @@ const labels: Record<string, string> = {
 };
 
 export default function TrackingPage() {
-  const searchParams = useSearchParams();
-  const requestedId = searchParams.get('orderId');
   const [orders, setOrders] = useState<Order[]>([]);
-  const [selectedId, setSelectedId] = useState(requestedId || '');
+  const [selectedId, setSelectedId] = useState('');
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -56,8 +53,7 @@ export default function TrackingPage() {
         const response = await api.get('/orders');
         const list: Order[] = response.data.orders || [];
         setOrders(list);
-        if (requestedId && list.some(o => o.id === requestedId)) setSelectedId(requestedId);
-        else if (!selectedId && list.length) setSelectedId(list[0].id);
+        if (list.length) setSelectedId(list[0].id);
       } catch (err: any) {
         setError(err.response?.data?.detail || 'Unable to load shipments.');
       } finally {
@@ -65,7 +61,7 @@ export default function TrackingPage() {
       }
     };
     load();
-  }, [requestedId]);
+  }, []);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -137,7 +133,7 @@ export default function TrackingPage() {
                 <div className="h-64 bg-gray-100 flex flex-col items-center justify-center text-center p-6">
                   <Truck className="h-12 w-12 text-primary-600 mb-3" />
                   <p className="font-medium text-gray-900">Pickup → Destination</p>
-                  <p className="text-sm text-gray-500 mt-1">Open the route in Google Maps for the live map and directions.</p>
+                  <p className="text-sm text-gray-500 mt-1">Open the route in Google Maps for directions.</p>
                   <a href={mapUrl} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center px-4 py-2 rounded-lg bg-primary-600 text-white font-medium hover:bg-primary-700"><ExternalLink className="h-4 w-4 mr-2" /> Open Map</a>
                 </div>
               </div>

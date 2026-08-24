@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 import resend
 from fastapi import Depends
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from twilio.rest import Client
 

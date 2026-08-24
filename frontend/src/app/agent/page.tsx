@@ -114,6 +114,18 @@ export default function AgentDashboard() {
     }
   };
 
+  const updateAgentStatus = async (newStatus: string) => {
+    setIsUpdatingStatus(true);
+    try {
+      await api.patch('/agents/status', { status: newStatus });
+      fetchDashboard();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Failed to update agent status');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
   const activeOrders = orders.filter(o => 
     ['picked_up', 'in_transit', 'out_for_delivery'].includes(o.status)
   );
@@ -140,7 +152,7 @@ export default function AgentDashboard() {
               Welcome, {profile?.user?.full_name?.split(' ')[0] || 'Agent'}!
             </h1>
             <p className="text-gray-600">
-              {profile?.employee_id} • {profile?.status.charAt(0).toUpperCase() + profile?.status.slice(1)}
+              {profile?.employee_id || 'N/A'} • {profile?.status ? profile.status.charAt(0).toUpperCase() + profile.status.slice(1) : 'N/A'}
             </p>
           </div>
           <div className="flex items-center gap-3">

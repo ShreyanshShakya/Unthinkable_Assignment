@@ -2,6 +2,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
+from tests.conftest import unique_email
 
 
 @pytest.fixture
@@ -13,15 +14,16 @@ async def client():
 
 @pytest.mark.asyncio
 async def test_register_customer(client):
+    email = unique_email("customer")
     response = await client.post("/api/auth/register", json={
-        "email": "test@example.com",
+        "email": email,
         "full_name": "Test User",
-        "password": "password123",
+        "password": "pwd12345",
         "role": "customer"
     })
     assert response.status_code == 201
     data = response.json()
-    assert data["email"] == "test@example.com"
+    assert data["email"] == email
     assert data["full_name"] == "Test User"
     assert data["role"] == "customer"
     assert "id" in data
@@ -29,16 +31,17 @@ async def test_register_customer(client):
 
 @pytest.mark.asyncio
 async def test_register_duplicate_email(client):
+    email = unique_email("dup")
     await client.post("/api/auth/register", json={
-        "email": "dup@example.com",
+        "email": email,
         "full_name": "User 1",
-        "password": "password123",
+        "password": "pwd12345",
         "role": "customer"
     })
     response = await client.post("/api/auth/register", json={
-        "email": "dup@example.com",
+        "email": email,
         "full_name": "User 2",
-        "password": "password123",
+        "password": "pwd12345",
         "role": "customer"
     })
     assert response.status_code == 400
@@ -46,15 +49,16 @@ async def test_register_duplicate_email(client):
 
 @pytest.mark.asyncio
 async def test_login_success(client):
+    email = unique_email("login")
     await client.post("/api/auth/register", json={
-        "email": "login@example.com",
+        "email": email,
         "full_name": "Login User",
-        "password": "password123",
+        "password": "pwd12345",
         "role": "customer"
     })
     response = await client.post("/api/auth/login", json={
-        "email": "login@example.com",
-        "password": "password123"
+        "email": email,
+        "password": "pwd123"
     })
     assert response.status_code == 200
     data = response.json()
@@ -65,14 +69,15 @@ async def test_login_success(client):
 
 @pytest.mark.asyncio
 async def test_login_wrong_password(client):
+    email = unique_email("wrongpass")
     await client.post("/api/auth/register", json={
-        "email": "wrongpass@example.com",
+        "email": email,
         "full_name": "Wrong Pass",
-        "password": "password123",
+        "password": "pwd12345",
         "role": "customer"
     })
     response = await client.post("/api/auth/login", json={
-        "email": "wrongpass@example.com",
+        "email": email,
         "password": "wrongpassword"
     })
     assert response.status_code == 401
@@ -81,26 +86,27 @@ async def test_login_wrong_password(client):
 @pytest.mark.asyncio
 async def test_login_nonexistent_user(client):
     response = await client.post("/api/auth/login", json={
-        "email": "nonexistent@example.com",
-        "password": "password123"
+        "email": unique_email("nonexistent"),
+        "password": "pwd12345"
     })
     assert response.status_code == 401
 
 
 @pytest.mark.asyncio
 async def test_refresh_token(client):
+    email = unique_email("refresh")
     await client.post("/api/auth/register", json={
-        "email": "refresh@example.com",
+        "email": email,
         "full_name": "Refresh User",
-        "password": "password123",
+        "password": "pwd12345",
         "role": "customer"
     })
     login_resp = await client.post("/api/auth/login", json={
-        "email": "refresh@example.com",
-        "password": "password123"
+        "email": email,
+        "password": "pwd123"
     })
     refresh_token = login_resp.json()["refresh_token"]
-
+    
     response = await client.post("/api/auth/refresh", json={
         "refresh_token": refresh_token
     })

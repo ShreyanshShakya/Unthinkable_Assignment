@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -96,7 +96,7 @@ export default function CreateOrderPage() {
   };
 
   // Auto-fetch quote when key fields change
-  useState(() => {
+  useEffect(() => {
     const subscription = watch((value, { name }) => {
       if (['pickup_pincode', 'drop_pincode', 'length_cm', 'breadth_cm', 'height_cm', 'actual_weight_kg', 'order_type', 'payment_type', 'order_value'].includes(name || '')) {
         const formData = { ...watch() };
@@ -164,7 +164,7 @@ export default function CreateOrderPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Pincode *</label>
                 <input
-                  {...register('pickup_pincode', { valueAsNumber: Number })}
+                  {...register('pickup_pincode', { valueAsNumber: true })}
                   type="number"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   placeholder="e.g., 110001"
@@ -210,7 +210,7 @@ export default function CreateOrderPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Pincode *</label>
                 <input
-                  {...register('drop_pincode', { valueAsNumber: Number })}
+                  {...register('drop_pincode', { valueAsNumber: true })}
                   type="number"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   placeholder="e.g., 400001"
@@ -246,7 +246,7 @@ export default function CreateOrderPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Length (cm) *</label>
                 <input
-                  {...register('length_cm', { valueAsNumber: Number })}
+                  {...register('length_cm', { valueAsNumber: true })}
                   type="number"
                   step="0.1"
                   min="1"
@@ -257,7 +257,7 @@ export default function CreateOrderPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Breadth (cm) *</label>
                 <input
-                  {...register('breadth_cm', { valueAsNumber: Number })}
+                  {...register('breadth_cm', { valueAsNumber: true })}
                   type="number"
                   step="0.1"
                   min="1"
@@ -268,7 +268,7 @@ export default function CreateOrderPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Height (cm) *</label>
                 <input
-                  {...register('height_cm', { valueAsNumber: Number })}
+                  {...register('height_cm', { valueAsNumber: true })}
                   type="number"
                   step="0.1"
                   min="1"
@@ -279,7 +279,7 @@ export default function CreateOrderPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Actual Weight (kg) *</label>
                 <input
-                  {...register('actual_weight_kg', { valueAsNumber: Number })}
+                  {...register('actual_weight_kg', { valueAsNumber: true })}
                   type="number"
                   step="0.1"
                   min="0.1"
@@ -320,7 +320,7 @@ export default function CreateOrderPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Order Value *</label>
                 <input
-                  {...register('order_value', { valueAsNumber: Number })}
+                  {...register('order_value', { valueAsNumber: true })}
                   type="number"
                   step="0.01"
                   min="0"

@@ -133,7 +133,8 @@ export function Layout({ children }: LayoutProps) {
                   Sign out
                 </button>
               </div>
-            </div>
+              </div>
+    </div>
         </div>
       )}
 

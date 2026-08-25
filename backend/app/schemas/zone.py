@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
@@ -26,8 +27,8 @@ class ZoneUpdate(BaseModel):
 class ZoneResponse(ZoneBase):
     id: UUID
     is_active: bool
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
@@ -56,8 +57,8 @@ class ZoneAreaResponse(ZoneAreaBase):
     id: UUID
     zone_id: UUID
     is_active: bool
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
@@ -84,10 +85,10 @@ class RateCardUpdate(BaseModel):
 class RateCardResponse(RateCardBase):
     id: UUID
     is_active: bool
-    effective_from: str
-    effective_to: Optional[str]
-    created_at: str
-    updated_at: str
+    effective_from: datetime
+    effective_to: Optional[datetime]
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
@@ -116,8 +117,8 @@ class RateCardRuleUpdate(BaseModel):
 class RateCardRuleResponse(RateCardRuleBase):
     id: UUID
     rate_card_id: UUID
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
@@ -148,8 +149,8 @@ class CODSurchargeResponse(CODSurchargeBase):
     id: UUID
     rate_card_id: UUID
     is_active: bool
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True

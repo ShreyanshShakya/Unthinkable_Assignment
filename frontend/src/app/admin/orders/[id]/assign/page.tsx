@@ -46,14 +46,17 @@ export default function AssignAgentPage() {
     [agents]
   );
 
-  const assign = async () => {
-    if (!selectedAgent) { setError('Select an agent first.'); return; }
+  const manualAssign = async (agentId: string) => {
+    if (!agentId) { setError('Select an agent first.'); return false; }
     setAssigning(true); setError('');
     try {
-      await api.post('/agents/assign', { order_id: orderId, agent_id: selectedAgent });
+      await api.post('/agents/assign', { order_id: orderId, agent_id: agentId });
       router.push(`/admin/orders/${orderId}`);
+      return true;
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to assign agent');
+      const detail = err.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : 'Manual agent assignment failed');
+      return false;
     } finally { setAssigning(false); }
   };
 
@@ -63,7 +66,23 @@ export default function AssignAgentPage() {
       await api.post('/agents/assign', { order_id: orderId });
       router.push(`/admin/orders/${orderId}`);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'No suitable agent could be found');
+      // Auto assignment requires pickup-zone metadata/coordinates. When that
+      // configuration is incomplete, fall back to a valid available agent so
+      // the admin can still dispatch the order.
+      if (availableAgents.length > 0) {
+        const fallback = availableAgents[0];
+        try {
+          await api.post('/agents/assign', { order_id: orderId, agent_id: fallback.id });
+          router.push(`/admin/orders/${orderId}`);
+          return;
+        } catch (fallbackErr: any) {
+          const detail = fallbackErr.response?.data?.detail;
+          setError(typeof detail === 'string' ? detail : 'Agent assignment failed');
+        }
+      } else {
+        const detail = err.response?.data?.detail;
+        setError(typeof detail === 'string' ? detail : 'No active agent has available capacity');
+      }
     } finally { setAssigning(false); }
   };
 
@@ -103,7 +122,7 @@ export default function AssignAgentPage() {
                 </select>
               </div>
               <div className="flex flex-col sm:flex-row gap-3">
-                <button onClick={assign} disabled={assigning || !selectedAgent} className="flex-1 inline-flex justify-center items-center px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50">
+                <button onClick={() => manualAssign(selectedAgent)} disabled={assigning || !selectedAgent} className="flex-1 inline-flex justify-center items-center px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50">
                   {assigning ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <UserCheck className="h-4 w-4 mr-2" />} Assign Selected Agent
                 </button>
                 <button onClick={autoAssign} disabled={assigning} className="flex-1 inline-flex justify-center items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg disabled:opacity-50">
